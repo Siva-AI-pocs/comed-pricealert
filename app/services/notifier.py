@@ -74,7 +74,10 @@ async def _send_whatsapp(to_number: str, message: str) -> tuple[bool, str]:
                     "text": {"body": message},
                 },
             )
-            resp.raise_for_status()
+            if not resp.is_success:
+                error_body = resp.text
+                logger.error("WhatsApp API error %s: %s", resp.status_code, error_body)
+                return False, f"HTTP {resp.status_code}: {error_body}"
             return True, ""
     except Exception as exc:
         return False, str(exc)
