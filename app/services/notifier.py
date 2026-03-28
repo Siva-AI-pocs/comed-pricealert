@@ -69,7 +69,7 @@ async def _send_whatsapp(to_number: str, message: str) -> tuple[bool, str]:
                 headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
                 json={
                     "messaging_product": "whatsapp",
-                    "to": to_number,
+                    "to": to_number.lstrip("+"),
                     "type": "text",
                     "text": {"body": message},
                 },
