@@ -59,19 +59,20 @@ async def _send_telegram(chat_id: str, message: str) -> tuple[bool, str]:
 
 
 async def _send_whatsapp(to_number: str, message: str) -> tuple[bool, str]:
-    if not settings.twilio_account_sid or not settings.twilio_auth_token:
-        return False, "Twilio credentials not configured"
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json"
+    if not settings.meta_whatsapp_token or not settings.meta_whatsapp_phone_id:
+        return False, "Meta WhatsApp credentials not configured"
+    url = f"https://graph.facebook.com/v19.0/{settings.meta_whatsapp_phone_id}/messages"
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 url,
-                data={
-                    "From": settings.twilio_whatsapp_from,
-                    "To": f"whatsapp:{to_number}",
-                    "Body": message,
+                headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
+                json={
+                    "messaging_product": "whatsapp",
+                    "to": to_number,
+                    "type": "text",
+                    "text": {"body": message},
                 },
-                auth=(settings.twilio_account_sid, settings.twilio_auth_token),
             )
             resp.raise_for_status()
             return True, ""

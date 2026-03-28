@@ -11,10 +11,9 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = ""
 
-    # WhatsApp via Twilio
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_whatsapp_from: str = "whatsapp:+14155238886"
+    # WhatsApp via Meta Cloud API
+    meta_whatsapp_token: str = ""
+    meta_whatsapp_phone_id: str = ""
 
     # Email / SMTP
     smtp_host: str = "smtp.gmail.com"
