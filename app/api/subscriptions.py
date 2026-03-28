@@ -1,10 +1,13 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Subscription
 from app.schemas import SubscribeRequest, SubscriptionOut
-from app.services.notifier import send_confirmation
+from app.services.notifier import _build_message, _log_alert, _send_email, _send_telegram, _send_whatsapp, send_confirmation
 
 router = APIRouter(prefix="/api", tags=["subscriptions"])
 
@@ -69,3 +72,59 @@ def unsubscribe(sub_id: int, db: Session = Depends(get_db)):
 @router.get("/subscriptions", response_model=list[SubscriptionOut])
 def list_subscriptions(db: Session = Depends(get_db)):
     return db.query(Subscription).order_by(Subscription.created_at.desc()).all()
+
+
+@router.post("/subscriptions/{sub_id}/alert")
+async def send_manual_alert(sub_id: int, db: Session = Depends(get_db)):
+    sub = db.query(Subscription).filter(Subscription.id == sub_id, Subscription.active == True).first()  # noqa: E712
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    # Fetch current price
+    current_price = db.execute(
+        text("SELECT price_cents FROM price_5min ORDER BY millis_utc DESC LIMIT 1")
+    ).scalar()
+    if current_price is None:
+        raise HTTPException(status_code=503, detail="No price data available yet")
+
+    # Fetch current hour avg
+    now = datetime.now(timezone.utc)
+    current_hour_start = now.replace(minute=0, second=0, microsecond=0)
+    hourly_avg = db.execute(
+        text("SELECT AVG(price_cents) FROM price_5min WHERE millis_utc >= :start"),
+        {"start": int(current_hour_start.timestamp() * 1000)},
+    ).scalar()
+    hourly_avg = round(hourly_avg, 2) if hourly_avg is not None else None
+
+    dashboard_url = "https://comed-pricealert.onrender.com"
+    message = _build_message(current_price, sub.threshold_cents, dashboard_url, "low", hourly_avg)
+
+    results = {}
+    any_sent = False
+
+    if sub.telegram_chat_id:
+        ok, err = await _send_telegram(sub.telegram_chat_id, message)
+        _log_alert(db, sub.id, current_price, "telegram", ok, err)
+        results["telegram"] = "ok" if ok else err
+        if ok:
+            any_sent = True
+
+    if sub.whatsapp_number:
+        ok, err = await _send_whatsapp(sub.whatsapp_number, message)
+        _log_alert(db, sub.id, current_price, "whatsapp", ok, err)
+        results["whatsapp"] = "ok" if ok else err
+        if ok:
+            any_sent = True
+
+    if sub.email:
+        ok, err = _send_email(sub.email, current_price, sub.threshold_cents, dashboard_url)
+        _log_alert(db, sub.id, current_price, "email", ok, err)
+        results["email"] = "ok" if ok else err
+        if ok:
+            any_sent = True
+
+    if any_sent:
+        sub.last_alerted_at = now
+        db.commit()
+
+    return {"price_cents": current_price, "hourly_avg": hourly_avg, "channels": results}

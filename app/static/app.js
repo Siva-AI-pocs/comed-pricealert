@@ -330,7 +330,10 @@ async function loadSubscriptions() {
       <td>${s.whatsapp_number || '—'}</td>
       <td>${s.threshold_cents.toFixed(2)}¢</td>
       <td>${s.last_alerted_at ? new Date(s.last_alerted_at).toLocaleString() : '—'}</td>
-      <td><button class="unsub-btn" onclick="unsubscribe(${s.id})">Remove</button></td>
+      <td style="display:flex;gap:6px">
+        <button class="send-now-btn" onclick="sendAlertNow(${s.id}, this)">Send Now</button>
+        <button class="unsub-btn" onclick="unsubscribe(${s.id})">Remove</button>
+      </td>
     </tr>
   `).join('');
   el.innerHTML = `
@@ -342,6 +345,31 @@ async function loadSubscriptions() {
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+async function sendAlertNow(id, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const resp = await fetch(`/api/subscriptions/${id}/alert`, { method: 'POST' });
+    const data = await resp.json();
+    if (resp.ok) {
+      const results = Object.entries(data.channels).map(([ch, r]) => `${ch}: ${r}`).join(', ');
+      btn.textContent = '✓ Sent';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = 'Send Now'; btn.style.borderColor = ''; btn.style.color = ''; btn.disabled = false; }, 3000);
+      loadSubscriptions();
+    } else {
+      btn.textContent = 'Failed';
+      btn.style.borderColor = 'var(--red)';
+      btn.style.color = 'var(--red)';
+      setTimeout(() => { btn.textContent = 'Send Now'; btn.style.borderColor = ''; btn.style.color = ''; btn.disabled = false; }, 3000);
+    }
+  } catch {
+    btn.textContent = 'Error';
+    setTimeout(() => { btn.textContent = 'Send Now'; btn.disabled = false; }, 3000);
+  }
 }
 
 async function unsubscribe(id) {
