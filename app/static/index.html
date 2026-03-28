@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ComEd Price Alert Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <!-- Chart.js + date adapter + annotation plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body>
+
+<div id="negativePriceBanner" class="negative-banner" style="display:none">
+  ⚡ Electricity is FREE! You're being paid to use power right now! ⚡
+</div>
+
+<header>
+  <h1>ComEd <span>Price Alert</span></h1>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    <span id="livePrice">Loading…</span>
+  </div>
+  <div id="stalenessWarning" class="staleness-warning" style="display:none">⚠ Data delayed</div>
+  <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark theme">🌙</button>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card" id="cardCurrent">
+    <div class="stat-label">Current Price</div>
+    <div class="stat-value" id="statCurrent">—</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">Hour Avg</div>
+    <div class="stat-value blue" id="statHourAvg">—</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">Today's Low</div>
+    <div class="stat-value green" id="statDayMin">—</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-label">Today's High</div>
+    <div class="stat-value orange" id="statDayMax">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">7-Day Avg</div>
+    <div class="stat-value" id="statWeekAvg">—</div>
+  </div>
+</div>
+
+<div id="decisionBanner" class="decision-banner" style="display:none"></div>
+
+<div class="charts-section">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">5-Minute Prices (¢/kWh)</div>
+      <div class="range-toggle">
+        <button class="range-btn active" onclick="setRange('5min',1,this)">1D</button>
+        <button class="range-btn" onclick="setRange('5min',7,this)">7D</button>
+      </div>
+    </div>
+    <div class="chart-wrapper"><canvas id="chart5min"></canvas></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Hourly Averages (¢/kWh)</div>
+      <div class="range-toggle">
+        <button class="range-btn active" onclick="setRange('hourly',1,this)">1D</button>
+        <button class="range-btn" onclick="setRange('hourly',7,this)">7D</button>
+      </div>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartHourly"></canvas></div>
+  </div>
+</div>
+
+<div class="daily-section">
+  <div class="daily-card">
+    <h2>7-Day Daily Summary</h2>
+    <div id="dailyTableContainer"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<div class="subscribe-section">
+  <div class="subscribe-card">
+    <h2>Subscribe to Price Alerts</h2>
+    <p>Get notified via Email, Telegram, or WhatsApp when the price drops to your threshold. At least one channel is required.</p>
+    <form id="subscribeForm" onsubmit="handleSubscribe(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Email (optional)</label>
+          <input type="email" id="inputEmail" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Telegram Chat ID (optional)</label>
+          <input type="text" id="inputTelegram" placeholder="e.g. 123456789" />
+          <div class="hint">Get your ID: message @userinfobot on Telegram</div>
+        </div>
+        <div class="form-group">
+          <label>WhatsApp Number (optional)</label>
+          <input type="text" id="inputWhatsapp" placeholder="+13125551234" />
+          <div class="hint">E.164 format. Requires Twilio sandbox join first.</div>
+        </div>
+        <div class="form-group">
+          <label>Alert Threshold (¢/kWh)</label>
+          <div class="threshold-group">
+            <input type="number" id="inputThreshold" value="0" step="0.1" />
+            <span>Alert when price ≤ this value</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>High Price Alert (optional)</label>
+          <div class="threshold-group">
+            <input type="number" id="inputHighThreshold" placeholder="e.g. 5" step="0.1" />
+            <span>Alert when price ≥ this value</span>
+          </div>
+          <div class="hint">Leave blank to skip high price alerts</div>
+        </div>
+      </div>
+      <button type="submit" class="submit-btn" id="submitBtn">Subscribe</button>
+      <div id="formMsg"></div>
+    </form>
+  </div>
+</div>
+
+<div class="subs-section">
+  <div class="subs-card">
+    <h2>Active Subscriptions</h2>
+    <div id="subsTableContainer"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<footer>
+  <span>Last updated: <span id="lastUpdated">—</span></span>
+  <span>
+    <a href="https://t.me/BotFather" target="_blank" rel="noopener">Set up Telegram</a>
+    &nbsp;·&nbsp;
+    <a href="https://www.twilio.com/console/sms/whatsapp/sandbox" target="_blank" rel="noopener">WhatsApp Sandbox</a>
+    &nbsp;·&nbsp;
+    <a href="/api/prices/stats" target="_blank">API</a>
+  </span>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

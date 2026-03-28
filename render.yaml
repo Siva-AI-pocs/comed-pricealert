@@ -1,0 +1,42 @@
+databases:
+  - name: comed-db
+    plan: free
+    databaseName: comed
+    user: comed
+
+services:
+  - type: web
+    name: comed-pricealert
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: comed-db
+          property: connectionString
+      - key: POLL_INTERVAL_SECONDS
+        value: "300"
+      - key: HISTORY_DAYS
+        value: "7"
+      - key: ALERT_COOLDOWN_MINUTES
+        value: "60"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        value: "whatsapp:+14155238886"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: ALERT_FROM_ADDRESS
+        sync: false
