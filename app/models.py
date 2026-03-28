@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -10,7 +10,7 @@ class Price5Min(Base):
     __tablename__ = "price_5min"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    millis_utc: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    millis_utc: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
     price_cents: Mapped[float] = mapped_column(Float, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
