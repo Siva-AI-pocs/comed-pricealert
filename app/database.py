@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import settings
@@ -18,6 +18,16 @@ class Base(DeclarativeBase):
 def init_db() -> None:
     from app import models  # noqa: F401 — ensure models are registered
     Base.metadata.create_all(bind=engine)
+    # Migrate millis_utc from INTEGER to BIGINT if needed (one-time fix)
+    if not settings.database_url.startswith("sqlite"):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE price_5min ALTER COLUMN millis_utc TYPE BIGINT"
+                ))
+                conn.commit()
+        except Exception:
+            pass  # Column already BIGINT or table doesn't exist yet
 
 
 def get_db():
