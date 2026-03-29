@@ -89,14 +89,6 @@ async def poll_and_store() -> None:
         logger.info("Poll complete: %d new rows", inserted)
 
         recompute_hourly_averages(db, since_hours_ago=2)
-
-        # Get latest price for alert check
-        latest = db.execute(
-            text("SELECT price_cents FROM price_5min ORDER BY millis_utc DESC LIMIT 1")
-        ).scalar()
-        if latest is not None:
-            from app.services.notifier import check_and_notify
-            await check_and_notify(db, float(latest))
     finally:
         db.close()
 

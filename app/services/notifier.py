@@ -137,17 +137,16 @@ def _log_alert(db: Session, sub_id: int, price: float, channel: str, success: bo
 async def check_and_notify(db: Session, current_price: float) -> None:
     from sqlalchemy import text as sa_text
     now = datetime.now(timezone.utc)
-    cooldown = timedelta(minutes=settings.alert_cooldown_minutes)
+    current_hour = now.replace(minute=0, second=0, microsecond=0)
 
     subs = db.query(Subscription).filter(Subscription.active == True).all()  # noqa: E712
 
-    dashboard_url = "https://your-app.onrender.com"  # overridden at deploy time via env
+    dashboard_url = "https://comed-pricealert.onrender.com"
 
     # Fetch current hour average once for all alerts
-    current_hour_start = now.replace(minute=0, second=0, microsecond=0)
     hourly_avg = db.execute(
         sa_text("SELECT AVG(price_cents) FROM price_5min WHERE millis_utc >= :start"),
-        {"start": int(current_hour_start.timestamp() * 1000)},
+        {"start": int(current_hour.timestamp() * 1000)},
     ).scalar()
     hourly_avg = round(hourly_avg, 2) if hourly_avg is not None else None
 
@@ -163,8 +162,13 @@ async def check_and_notify(db: Session, current_price: float) -> None:
         if not (should_alert_low or should_alert_high):
             continue
 
-        if sub.last_alerted_at and (now - sub.last_alerted_at.replace(tzinfo=timezone.utc)) < cooldown:
-            continue
+        # Allow one alert per calendar hour — skip if already alerted this hour
+        if sub.last_alerted_at:
+            last_alert_hour = sub.last_alerted_at.replace(tzinfo=timezone.utc).replace(
+                minute=0, second=0, microsecond=0
+            )
+            if last_alert_hour >= current_hour:
+                continue
 
         if should_alert_high:
             direction = "high"
