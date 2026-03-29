@@ -147,8 +147,14 @@ async def check_and_notify(db: Session, current_price: float) -> None:
     hourly_avg = round(hourly_avg, 2) if hourly_avg is not None else None
 
     for sub in subs:
-        should_alert_low = current_price <= sub.threshold_cents
-        should_alert_high = sub.high_threshold_cents is not None and current_price >= sub.high_threshold_cents
+        should_alert_low = (
+            current_price <= sub.threshold_cents
+            or (hourly_avg is not None and hourly_avg <= sub.threshold_cents)
+        )
+        should_alert_high = sub.high_threshold_cents is not None and (
+            current_price >= sub.high_threshold_cents
+            or (hourly_avg is not None and hourly_avg >= sub.high_threshold_cents)
+        )
         if not (should_alert_low or should_alert_high):
             continue
 
