@@ -27,12 +27,17 @@ def _build_message(
 
     if direction == "high":
         headline = "⬆️ ComEd High Price Alert"
-        price_line = f"5-Min Price:   {price:.2f}¢/kWh  ← above your {threshold:.2f}¢ high alert"
+        label = f"above your {threshold:.2f}¢ high alert"
+        price_tag = f"  ← {label}" if price >= threshold else ""
+        avg_tag = f"  ← {label}" if hourly_avg is not None and hourly_avg >= threshold else ""
     else:
         headline = "⬇️ ComEd Low Price Alert"
-        price_line = f"5-Min Price:   {price:.2f}¢/kWh  ← below your {threshold:.2f}¢ low alert"
+        label = f"below your {threshold:.2f}¢ low alert"
+        price_tag = f"  ← {label}" if price <= threshold else ""
+        avg_tag = f"  ← {label}" if hourly_avg is not None and hourly_avg <= threshold else ""
 
-    avg_line = f"Hour Avg:      {hourly_avg:.2f}¢/kWh" if hourly_avg is not None else "Hour Avg:      —"
+    price_line = f"5-Min Price:   {price:.2f}¢/kWh{price_tag}"
+    avg_line = f"Hour Avg:      {hourly_avg:.2f}¢/kWh{avg_tag}" if hourly_avg is not None else "Hour Avg:      —"
 
     return (
         f"{headline}\n"
