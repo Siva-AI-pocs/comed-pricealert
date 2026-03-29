@@ -25,11 +25,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ComEd Price Alert", lifespan=lifespan)
 
 # API routers
-from app.api import decision, prices, subscriptions  # noqa: E402
+from app.api import decision, internal, prices, subscriptions  # noqa: E402
 
 app.include_router(prices.router)
 app.include_router(subscriptions.router)
 app.include_router(decision.router)
+app.include_router(internal.router)
 
 
 @app.get("/health")

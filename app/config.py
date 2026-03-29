@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     alert_cooldown_minutes: int = 60
 
+    # Secret token for /internal/* trigger endpoints (used by cron-job.org)
+    internal_secret: str = ""
+
     app_host: str = "0.0.0.0"
     app_port: int = 8000
 

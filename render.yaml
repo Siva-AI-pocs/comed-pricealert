@@ -34,6 +34,8 @@ services:
         sync: false
       - key: ALERT_FROM_ADDRESS
         sync: false
+      - key: INTERNAL_SECRET
+        sync: false
 
   # Polls ComEd API every 5 minutes and saves prices to DB
   - type: cron
