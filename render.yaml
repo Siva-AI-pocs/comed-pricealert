@@ -16,20 +16,60 @@ services:
         fromDatabase:
           name: comed-db
           property: connectionString
-      - key: POLL_INTERVAL_SECONDS
-        value: "300"
       - key: HISTORY_DAYS
         value: "7"
-      - key: ALERT_COOLDOWN_MINUTES
-        value: "60"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
-      - key: TWILIO_ACCOUNT_SID
+      - key: META_WHATSAPP_TOKEN
         sync: false
-      - key: TWILIO_AUTH_TOKEN
+      - key: META_WHATSAPP_PHONE_ID
         sync: false
-      - key: TWILIO_WHATSAPP_FROM
-        value: "whatsapp:+14155238886"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: ALERT_FROM_ADDRESS
+        sync: false
+
+  # Polls ComEd API every 5 minutes and saves prices to DB
+  - type: cron
+    name: comed-poller
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    schedule: "*/5 * * * *"
+    startCommand: python -m app.jobs.poll
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: comed-db
+          property: connectionString
+      - key: HISTORY_DAYS
+        value: "7"
+
+  # Checks thresholds and sends alerts at the top of every hour
+  - type: cron
+    name: comed-notifier
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 * * * *"
+    startCommand: python -m app.jobs.notify
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: comed-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: META_WHATSAPP_TOKEN
+        sync: false
+      - key: META_WHATSAPP_PHONE_ID
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

@@ -6,9 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
 from app.database import init_db
-from app.services.scheduler import create_scheduler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,10 +19,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    scheduler = create_scheduler()
-    scheduler.start()
     yield
-    scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="ComEd Price Alert", lifespan=lifespan)
