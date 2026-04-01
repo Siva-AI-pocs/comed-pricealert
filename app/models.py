@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,10 +28,38 @@ class HourlyAverage(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(Text, unique=True, nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    subscriptions: Mapped[list["Subscription"]] = relationship("Subscription", back_populates="user")
+    comed_account: Mapped[Optional["ComedAccount"]] = relationship("ComedAccount", back_populates="user", uselist=False)
+
+
+class ComedAccount(Base):
+    __tablename__ = "comed_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    access_token_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    authorized_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    subscription_id_espi: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    user: Mapped["User"] = relationship("User", back_populates="comed_account")
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     email: Mapped[str | None] = mapped_column(Text, nullable=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     whatsapp_number: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -38,6 +69,7 @@ class Subscription(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     last_alerted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="subscriptions")
     alerts: Mapped[list["AlertLog"]] = relationship("AlertLog", back_populates="subscription")
 
 

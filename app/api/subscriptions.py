@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth.deps import get_current_user, get_optional_user
 from app.database import get_db
-from app.models import Subscription
+from app.models import Subscription, User
 from app.schemas import SubscribeRequest, SubscriptionOut
 from app.services.notifier import _build_message, _log_alert, _send_email, _send_telegram, _send_whatsapp, send_confirmation
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["subscriptions"])
 
 
 @router.post("/subscribe", response_model=SubscriptionOut)
-async def subscribe(req: SubscribeRequest, db: Session = Depends(get_db)):
+async def subscribe(req: SubscribeRequest, db: Session = Depends(get_db), current_user: User | None = Depends(get_optional_user)):
     if not req.has_channel():
         raise HTTPException(
             status_code=422,
@@ -40,11 +41,14 @@ async def subscribe(req: SubscribeRequest, db: Session = Depends(get_db)):
         existing.threshold_cents = req.threshold_cents
         existing.high_threshold_cents = req.high_threshold_cents
         existing.active = True
+        if current_user and existing.user_id is None:
+            existing.user_id = current_user.id
         db.commit()
         db.refresh(existing)
         return existing
 
     sub = Subscription(
+        user_id=current_user.id if current_user else None,
         email=req.email,
         telegram_chat_id=req.telegram_chat_id,
         whatsapp_number=req.whatsapp_number,
@@ -60,18 +64,25 @@ async def subscribe(req: SubscribeRequest, db: Session = Depends(get_db)):
 
 
 @router.delete("/subscribe/{sub_id}")
-def unsubscribe(sub_id: int, db: Session = Depends(get_db)):
+def unsubscribe(sub_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     sub = db.query(Subscription).filter(Subscription.id == sub_id).first()
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
+    if sub.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     sub.active = False
     db.commit()
     return {"message": "Unsubscribed successfully"}
 
 
 @router.get("/subscriptions", response_model=list[SubscriptionOut])
-def list_subscriptions(db: Session = Depends(get_db)):
-    return db.query(Subscription).order_by(Subscription.created_at.desc()).all()
+def list_subscriptions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return (
+        db.query(Subscription)
+        .filter(Subscription.user_id == current_user.id, Subscription.active == True)  # noqa: E712
+        .order_by(Subscription.created_at.desc())
+        .all()
+    )
 
 
 @router.post("/subscriptions/{sub_id}/alert")

@@ -23,8 +23,53 @@
     <span id="livePrice">Loading…</span>
   </div>
   <div id="stalenessWarning" class="staleness-warning" style="display:none">⚠ Data delayed</div>
+  <div id="authArea">
+    <div id="authLoggedOut">
+      <button class="auth-btn" onclick="showAuthModal('login')">Login</button>
+      <button class="auth-btn secondary" onclick="showAuthModal('register')">Sign Up</button>
+    </div>
+    <div id="authLoggedIn" style="display:none">
+      <span id="authUserEmail" class="auth-email"></span>
+      <button class="auth-btn secondary" onclick="handleLogout()">Logout</button>
+    </div>
+  </div>
   <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark theme">🌙</button>
 </header>
+
+<!-- Auth Modal -->
+<div id="authModal" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event)">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeAuthModal()">×</button>
+    <div id="modalLoginForm">
+      <h2>Login</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="Password" />
+      </div>
+      <button class="submit-btn" onclick="handleLogin()">Login</button>
+      <div id="loginMsg" class="form-msg"></div>
+      <p class="auth-switch">No account? <a href="#" onclick="showAuthModal('register'); return false;">Sign up</a></p>
+    </div>
+    <div id="modalRegisterForm" style="display:none">
+      <h2>Create Account</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="regEmail" placeholder="you@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPassword" placeholder="Min 8 characters" />
+      </div>
+      <button class="submit-btn" onclick="handleRegister()">Create Account</button>
+      <div id="regMsg" class="form-msg"></div>
+      <p class="auth-switch">Have an account? <a href="#" onclick="showAuthModal('login'); return false;">Login</a></p>
+    </div>
+  </div>
+</div>
 
 <div class="stats-bar">
   <div class="stat-card" id="cardCurrent">
@@ -82,9 +127,13 @@
   </div>
 </div>
 
-<div class="subscribe-section">
+<div class="subscribe-section" id="subscribeSection">
   <div class="subscribe-card">
     <h2>Subscribe to Price Alerts</h2>
+    <div id="subscribeLoginPrompt" style="display:none">
+      <p>Please <a href="#" onclick="showAuthModal('login'); return false;">login</a> or <a href="#" onclick="showAuthModal('register'); return false;">create an account</a> to subscribe to price alerts.</p>
+    </div>
+    <div id="subscribeFormWrapper">
     <p>Get notified via Email, Telegram, or WhatsApp when the price drops to your threshold. At least one channel is required.</p>
     <form id="subscribeForm" onsubmit="handleSubscribe(event)">
       <div class="form-grid">
@@ -121,13 +170,43 @@
       <button type="submit" class="submit-btn" id="submitBtn">Subscribe</button>
       <div id="formMsg"></div>
     </form>
+    </div>
   </div>
 </div>
 
 <div class="subs-section">
   <div class="subs-card">
-    <h2>Active Subscriptions</h2>
+    <h2>My Subscriptions</h2>
+    <div id="subsLoginPrompt" style="display:none">
+      <p style="color:var(--muted);font-size:13px">Please <a href="#" onclick="showAuthModal('login'); return false;">login</a> to view your subscriptions.</p>
+    </div>
     <div id="subsTableContainer"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<!-- ComEd Account Section (shown only when logged in) -->
+<div class="comed-section" id="comedSection" style="display:none">
+  <div class="comed-card">
+    <h2>ComEd Account</h2>
+    <div id="comedConnected" style="display:none">
+      <p class="success-text">Connected to ComEd Green Button data.</p>
+      <p style="color:var(--muted);font-size:13px">Your 15-minute interval usage data is accessible. You can disconnect at any time.</p>
+      <button class="unsub-btn" onclick="handleComedDisconnect()">Disconnect</button>
+    </div>
+    <div id="comedDisconnected">
+      <p>Connect your ComEd account to grant this app access to your 15-minute interval usage data.</p>
+      <div class="comed-consent">
+        <strong>Before you connect, please note:</strong>
+        <ul>
+          <li>You will be redirected to ComEd's website to log in and approve data sharing</li>
+          <li>This app will access your 15-minute electricity usage data (up to 13 months)</li>
+          <li>Your ComEd username and password are never shared with this app</li>
+          <li>You can revoke access at any time via your ComEd account settings or by clicking Disconnect</li>
+          <li>Data is stored securely and encrypted at rest</li>
+        </ul>
+      </div>
+      <button class="submit-btn" onclick="handleComedConnect()">Connect ComEd Account</button>
+    </div>
   </div>
 </div>
 

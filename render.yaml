@@ -36,6 +36,18 @@ services:
         sync: false
       - key: INTERNAL_SECRET
         sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: COMED_CLIENT_ID
+        sync: false
+      - key: COMED_CLIENT_SECRET
+        sync: false
+      - key: COMED_REDIRECT_URI
+        value: "https://comed-pricealert.onrender.com/auth/comed/callback"
+      - key: APP_BASE_URL
+        value: "https://comed-pricealert.onrender.com"
 
   # Polls ComEd API every 5 minutes and saves prices to DB
   - type: cron

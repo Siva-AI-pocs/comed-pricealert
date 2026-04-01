@@ -28,6 +28,15 @@ def init_db() -> None:
                 conn.commit()
         except Exception:
             pass  # Column already BIGINT or table doesn't exist yet
+        # Add user_id FK to subscriptions if not present yet (one-time migration)
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE subscriptions ADD COLUMN user_id INTEGER REFERENCES users(id)"
+                ))
+                conn.commit()
+        except Exception:
+            pass  # Column already exists
 
 
 def get_db():

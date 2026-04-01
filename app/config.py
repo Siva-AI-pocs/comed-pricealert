@@ -27,6 +27,20 @@ class Settings(BaseSettings):
     # Secret token for /internal/* trigger endpoints (used by cron-job.org)
     internal_secret: str = ""
 
+    # Auth
+    jwt_secret_key: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    # ComEd Green Button OAuth
+    comed_client_id: str = ""
+    comed_client_secret: str = ""
+    comed_redirect_uri: str = ""
+    token_encryption_key: str = ""
+
+    # App base URL (for building redirect URIs and links)
+    app_base_url: str = "https://comed-pricealert.onrender.com"
+
     app_host: str = "0.0.0.0"
     app_port: int = 8000
 

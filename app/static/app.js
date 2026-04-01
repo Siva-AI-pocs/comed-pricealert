@@ -310,8 +310,167 @@ async function loadDailySummary() {
   `;
 }
 
+// ── Auth state ───────────────────────────────────────────────────────────────
+let currentUser = null;
+
+async function initAuth() {
+  try {
+    const resp = await fetch('/auth/me');
+    if (resp.ok) {
+      currentUser = await resp.json();
+    } else {
+      currentUser = null;
+    }
+  } catch {
+    currentUser = null;
+  }
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  const loggedOut = document.getElementById('authLoggedOut');
+  const loggedIn  = document.getElementById('authLoggedIn');
+  const emailEl   = document.getElementById('authUserEmail');
+  const subPrompt = document.getElementById('subsLoginPrompt');
+  const subTable  = document.getElementById('subsTableContainer');
+  const subForm   = document.getElementById('subscribeFormWrapper');
+  const subLoginP = document.getElementById('subscribeLoginPrompt');
+  const comedSec  = document.getElementById('comedSection');
+  const comedConn = document.getElementById('comedConnected');
+  const comedDisc = document.getElementById('comedDisconnected');
+
+  if (currentUser) {
+    loggedOut.style.display = 'none';
+    loggedIn.style.display  = '';
+    emailEl.textContent = currentUser.email;
+    subPrompt.style.display = 'none';
+    subTable.style.display  = '';
+    subForm.style.display   = '';
+    subLoginP.style.display = 'none';
+    comedSec.style.display  = '';
+    if (currentUser.comed_connected) {
+      comedConn.style.display = '';
+      comedDisc.style.display = 'none';
+    } else {
+      comedConn.style.display = 'none';
+      comedDisc.style.display = '';
+    }
+  } else {
+    loggedOut.style.display = '';
+    loggedIn.style.display  = 'none';
+    subPrompt.style.display = '';
+    subTable.style.display  = 'none';
+    subForm.style.display   = 'none';
+    subLoginP.style.display = '';
+    comedSec.style.display  = 'none';
+  }
+}
+
+function showAuthModal(mode) {
+  document.getElementById('authModal').style.display = '';
+  document.getElementById('modalLoginForm').style.display    = mode === 'login' ? '' : 'none';
+  document.getElementById('modalRegisterForm').style.display = mode === 'register' ? '' : 'none';
+  document.getElementById('loginMsg').textContent = '';
+  document.getElementById('regMsg').textContent   = '';
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').style.display = 'none';
+}
+
+function closeModalOnOverlay(event) {
+  if (event.target === document.getElementById('authModal')) closeAuthModal();
+}
+
+async function handleLogin() {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const msg      = document.getElementById('loginMsg');
+  msg.textContent = '';
+  try {
+    const resp = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (resp.ok) {
+      currentUser = await resp.json();
+      closeAuthModal();
+      updateAuthUI();
+      loadSubscriptions();
+    } else {
+      const err = await resp.json();
+      msg.textContent = err.detail || 'Login failed.';
+      msg.className = 'form-msg error';
+    }
+  } catch {
+    msg.textContent = 'Network error. Please try again.';
+    msg.className = 'form-msg error';
+  }
+}
+
+async function handleRegister() {
+  const email    = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const msg      = document.getElementById('regMsg');
+  msg.textContent = '';
+  try {
+    const resp = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (resp.ok) {
+      currentUser = await resp.json();
+      closeAuthModal();
+      updateAuthUI();
+      loadSubscriptions();
+    } else {
+      const err = await resp.json();
+      msg.textContent = err.detail || 'Registration failed.';
+      msg.className = 'form-msg error';
+    }
+  } catch {
+    msg.textContent = 'Network error. Please try again.';
+    msg.className = 'form-msg error';
+  }
+}
+
+async function handleLogout() {
+  await fetch('/auth/logout', { method: 'POST' });
+  currentUser = null;
+  updateAuthUI();
+}
+
+function handleComedConnect() {
+  window.location.href = '/auth/comed/connect';
+}
+
+async function handleComedDisconnect() {
+  if (!confirm('Disconnect your ComEd account?')) return;
+  await fetch('/auth/comed/disconnect', { method: 'DELETE' });
+  currentUser = await (await fetch('/auth/me')).json();
+  updateAuthUI();
+}
+
+function checkComedCallback() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('comed') === 'connected') {
+    const banner = document.createElement('div');
+    banner.className = 'comed-success-banner';
+    banner.textContent = 'ComEd account connected successfully!';
+    document.body.insertBefore(banner, document.body.firstChild);
+    setTimeout(() => banner.remove(), 5000);
+    history.replaceState({}, '', '/');
+  }
+}
+
 // ── Subscriptions table ──────────────────────────────────────────────────────
 async function loadSubscriptions() {
+  if (!currentUser) {
+    updateAuthUI();
+    return;
+  }
   const subs = await fetchJSON('/api/subscriptions');
   const el = document.getElementById('subsTableContainer');
   if (!subs || subs.length === 0) {
@@ -463,6 +622,8 @@ function mergeDeep(target, ...sources) {
 // ── Init + auto-refresh ──────────────────────────────────────────────────────
 async function init() {
   initTheme();
+  checkComedCallback();
+  await initAuth();
   await updateStats();
   await updateDecision();
   await Promise.all([init5MinChart(), initHourlyChart(), loadSubscriptions(), loadDailySummary()]);

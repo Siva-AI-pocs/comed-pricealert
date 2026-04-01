@@ -78,3 +78,29 @@ class SubscriptionOut(BaseModel):
     last_alerted_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+    comed_connected: bool = False
+
+    model_config = {"from_attributes": True}
