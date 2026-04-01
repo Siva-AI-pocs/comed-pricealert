@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — ComEd Price Alert</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .policy-container { max-width: 800px; margin: 40px auto; padding: 0 24px 60px; }
+    .policy-container h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .policy-container h2 { font-size: 1.1rem; margin-top: 32px; margin-bottom: 8px; color: var(--accent); }
+    .policy-container p, .policy-container li { color: var(--muted); line-height: 1.7; font-size: 0.95rem; }
+    .policy-container ul { padding-left: 20px; }
+    .back-link { display: inline-block; margin-bottom: 24px; color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+    .back-link:hover { text-decoration: underline; }
+    .updated { color: var(--muted); font-size: 0.85rem; margin-bottom: 32px; }
+  </style>
+</head>
+<body>
+<div class="policy-container">
+  <a href="/" class="back-link">← Back to Dashboard</a>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: April 1, 2026</p>
+
+  <h2>1. Overview</h2>
+  <p>ComEd Price Alert ("the App") is a personal energy management application that displays real-time ComEd electricity pricing and sends price alerts. This policy explains what data we collect, how we use it, and your rights.</p>
+
+  <h2>2. Data We Collect</h2>
+  <ul>
+    <li><strong>Account information:</strong> Email address and hashed password when you create an account.</li>
+    <li><strong>Alert preferences:</strong> Email address, Telegram Chat ID, or WhatsApp number you provide for price alert subscriptions, along with your alert threshold settings.</li>
+    <li><strong>ComEd usage data (optional):</strong> If you connect your ComEd account via Green Button Connect, we access your 15-minute electricity interval usage data (up to 13 months of history) using OAuth 2.0 authorization. Your ComEd username and password are never shared with this App.</li>
+    <li><strong>Price data:</strong> Real-time and historical ComEd 5-minute interval pricing fetched from ComEd's public API.</li>
+  </ul>
+
+  <h2>3. How We Use Your Data</h2>
+  <ul>
+    <li>To send you price alerts via your chosen notification channels (email, Telegram, WhatsApp).</li>
+    <li>To display your personalized energy usage alongside real-time pricing (if ComEd account is connected).</li>
+    <li>To maintain your account and subscription preferences.</li>
+    <li>We do not sell, share, or use your data for advertising or any purpose beyond operating this App.</li>
+  </ul>
+
+  <h2>4. ComEd Green Button Data</h2>
+  <p>If you choose to connect your ComEd account:</p>
+  <ul>
+    <li>We access your 15-minute interval electricity usage data via ComEd's Green Button Connect My Data program.</li>
+    <li>Your ComEd OAuth tokens are encrypted at rest using AES-128 (Fernet) encryption.</li>
+    <li>You can revoke access at any time by clicking "Disconnect" in the App, or by removing access directly from your ComEd account settings at <a href="https://secure.comed.com" target="_blank" rel="noopener">secure.comed.com</a>.</li>
+    <li>We retain your usage data only as long as your account is active. You may request deletion at any time.</li>
+  </ul>
+
+  <h2>5. Data Storage and Security</h2>
+  <ul>
+    <li>Data is stored in a PostgreSQL database hosted on Render (Oregon, USA).</li>
+    <li>All connections use HTTPS/TLS encryption in transit.</li>
+    <li>Passwords are hashed using bcrypt and never stored in plain text.</li>
+    <li>OAuth tokens are encrypted at rest.</li>
+  </ul>
+
+  <h2>6. Data Retention</h2>
+  <ul>
+    <li>Price data is retained for up to 7 days of history.</li>
+    <li>Account and subscription data is retained until you delete your account.</li>
+    <li>You may request deletion of your data by contacting us at rdsiva@gmail.com.</li>
+  </ul>
+
+  <h2>7. Third-Party Services</h2>
+  <p>The App uses the following third-party services to deliver notifications:</p>
+  <ul>
+    <li><strong>Gmail SMTP</strong> — for email alerts</li>
+    <li><strong>Telegram Bot API</strong> — for Telegram alerts</li>
+    <li><strong>Twilio / Meta WhatsApp Business API</strong> — for WhatsApp alerts</li>
+  </ul>
+  <p>Your notification contact details (email/phone/chat ID) are transmitted to these services solely to deliver your requested alerts.</p>
+
+  <h2>8. Your Rights</h2>
+  <ul>
+    <li>You may view, update, or delete your subscription preferences at any time from the dashboard.</li>
+    <li>You may disconnect your ComEd account at any time.</li>
+    <li>You may request complete deletion of your account and data by emailing rdsiva@gmail.com.</li>
+  </ul>
+
+  <h2>9. Contact</h2>
+  <p>For questions about this privacy policy or your data, contact: <a href="mailto:rdsiva@gmail.com">rdsiva@gmail.com</a></p>
+</div>
+</body>
+</html>

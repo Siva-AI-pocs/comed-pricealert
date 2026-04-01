@@ -46,3 +46,13 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/")
 def index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/privacy")
+def privacy():
+    return FileResponse(STATIC_DIR / "privacy.html")
+
+
+@app.get("/terms")
+def terms():
+    return FileResponse(STATIC_DIR / "terms.html")
