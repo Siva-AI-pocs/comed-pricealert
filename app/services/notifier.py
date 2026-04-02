@@ -150,6 +150,13 @@ async def check_and_notify(db: Session, current_price: float) -> None:
     ).scalar()
     hourly_avg = round(hourly_avg, 2) if hourly_avg is not None else None
 
+    logger.info(
+        "Notify check: price=%.2f¢, hourly_avg=%s¢, active_subs=%d",
+        current_price,
+        f"{hourly_avg:.2f}" if hourly_avg is not None else "n/a",
+        len(subs),
+    )
+
     for sub in subs:
         should_alert_low = (
             current_price <= sub.threshold_cents
@@ -160,6 +167,11 @@ async def check_and_notify(db: Session, current_price: float) -> None:
             or (hourly_avg is not None and hourly_avg >= sub.high_threshold_cents)
         )
         if not (should_alert_low or should_alert_high):
+            logger.debug(
+                "sub_id=%d skipped: price=%.2f not crossing low=%.2f high=%s",
+                sub.id, current_price, sub.threshold_cents,
+                f"{sub.high_threshold_cents:.2f}" if sub.high_threshold_cents else "none",
+            )
             continue
 
         # Allow one alert per calendar hour — skip if already alerted this hour
@@ -168,6 +180,10 @@ async def check_and_notify(db: Session, current_price: float) -> None:
                 minute=0, second=0, microsecond=0
             )
             if last_alert_hour >= current_hour:
+                logger.info(
+                    "sub_id=%d skipped: already alerted this hour (last_alerted_at=%s)",
+                    sub.id, sub.last_alerted_at,
+                )
                 continue
 
         if should_alert_high:

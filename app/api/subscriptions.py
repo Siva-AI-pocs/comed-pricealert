@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,6 +10,8 @@ from app.database import get_db
 from app.models import Subscription, User
 from app.schemas import SubscribeRequest, SubscriptionOut
 from app.services.notifier import _build_message, _log_alert, _send_email, _send_telegram, _send_whatsapp, send_confirmation
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["subscriptions"])
 
@@ -119,6 +122,9 @@ async def send_manual_alert(sub_id: int, db: Session = Depends(get_db)):
         results["telegram"] = "ok" if ok else err
         if ok:
             any_sent = True
+            logger.info("Manual Telegram alert sent: sub_id=%d", sub.id)
+        else:
+            logger.warning("Manual Telegram alert failed: sub_id=%d err=%s", sub.id, err)
 
     if sub.whatsapp_number:
         ok, err = await _send_whatsapp(sub.whatsapp_number, message)
@@ -126,6 +132,9 @@ async def send_manual_alert(sub_id: int, db: Session = Depends(get_db)):
         results["whatsapp"] = "ok" if ok else err
         if ok:
             any_sent = True
+            logger.info("Manual WhatsApp alert sent: sub_id=%d", sub.id)
+        else:
+            logger.warning("Manual WhatsApp alert failed: sub_id=%d err=%s", sub.id, err)
 
     if sub.email:
         ok, err = _send_email(sub.email, current_price, sub.threshold_cents, dashboard_url)
@@ -133,6 +142,9 @@ async def send_manual_alert(sub_id: int, db: Session = Depends(get_db)):
         results["email"] = "ok" if ok else err
         if ok:
             any_sent = True
+            logger.info("Manual email alert sent: sub_id=%d", sub.id)
+        else:
+            logger.warning("Manual email alert failed: sub_id=%d err=%s", sub.id, err)
 
     if any_sent:
         sub.last_alerted_at = now
