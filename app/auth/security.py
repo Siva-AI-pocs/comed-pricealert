@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from cryptography.fernet import Fernet
@@ -17,9 +18,16 @@ def verify_password(plain: str, hashed: str) -> bool:
     return _pwd_context.verify(plain, hashed)
 
 
+def generate_numeric_code(digits: int = 6) -> str:
+    """Cryptographically-random numeric code (e.g. for password reset)."""
+    return "".join(secrets.choice("0123456789") for _ in range(digits))
+
+
 def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
-        minutes=expires_minutes if expires_minutes is not None else settings.jwt_expire_minutes
+        minutes=expires_minutes
+        if expires_minutes is not None
+        else settings.jwt_expire_minutes
     )
     return jwt.encode(
         {**data, "exp": expire},
@@ -30,7 +38,9 @@ def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
 
 def decode_access_token(token: str) -> dict:
     """Decode and verify a JWT. Raises JWTError on invalid/expired tokens."""
-    return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    return jwt.decode(
+        token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+    )
 
 
 def _fernet() -> Fernet:

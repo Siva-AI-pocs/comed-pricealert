@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, get_optional_user
+from app.config import settings
 from app.database import get_db
 from app.models import Subscription, User
 from app.schemas import SubscribeRequest, SubscriptionOut
@@ -110,7 +111,7 @@ async def send_manual_alert(sub_id: int, db: Session = Depends(get_db)):
     ).scalar()
     hourly_avg = round(hourly_avg, 2) if hourly_avg is not None else None
 
-    dashboard_url = "https://comed-pricealert.onrender.com"
+    dashboard_url = settings.app_base_url
     message = _build_message(current_price, sub.threshold_cents, dashboard_url, "low", hourly_avg)
 
     results = {}

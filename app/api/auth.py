@@ -12,20 +12,31 @@ from app.auth.security import (
     create_access_token,
     decode_access_token,
     encrypt_token,
+    generate_numeric_code,
     get_password_hash,
     verify_password,
 )
 from app.config import settings
 from app.database import get_db
 from app.models import ComedAccount, Subscription, User
-from app.schemas import LoginRequest, RegisterRequest, UserOut
+from app.schemas import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    LoginRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    UserOut,
+)
+from app.services import notifier
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _COOKIE_MAX_AGE = settings.jwt_expire_minutes * 60
 _SECURE_COOKIE = settings.app_base_url.startswith("https")
 
-COMED_AUTH_URL = "https://secure.comed.com/MyAccount/MyBillUsage/pages/GBCThirdPartyReg.aspx"
+COMED_AUTH_URL = (
+    "https://secure.comed.com/MyAccount/MyBillUsage/pages/GBCThirdPartyReg.aspx"
+)
 COMED_TOKEN_URL = "https://secure.comed.com/sso/oauth2/access_token"
 COMED_SCOPE = "FB=4_5_15;IntervalDuration=900;BlockDuration=monthly;HistoryLength=13"
 
@@ -66,7 +77,9 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.refresh(user)
     _claim_orphan_subscriptions(db, user)
     token = create_access_token({"sub": str(user.id)})
-    out = UserOut(id=user.id, email=user.email, created_at=user.created_at, comed_connected=False)
+    out = UserOut(
+        id=user.id, email=user.email, created_at=user.created_at, comed_connected=False
+    )
     resp = JSONResponse(content=out.model_dump(mode="json"))
     _set_auth_cookie(resp, token)
     return resp
@@ -79,8 +92,16 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     _claim_orphan_subscriptions(db, user)
     token = create_access_token({"sub": str(user.id)})
-    comed_connected = db.query(ComedAccount).filter(ComedAccount.user_id == user.id).first() is not None
-    out = UserOut(id=user.id, email=user.email, created_at=user.created_at, comed_connected=comed_connected)
+    comed_connected = (
+        db.query(ComedAccount).filter(ComedAccount.user_id == user.id).first()
+        is not None
+    )
+    out = UserOut(
+        id=user.id,
+        email=user.email,
+        created_at=user.created_at,
+        comed_connected=comed_connected,
+    )
     resp = JSONResponse(content=out.model_dump(mode="json"))
     _set_auth_cookie(resp, token)
     return resp
@@ -93,9 +114,65 @@ def logout():
     return resp
 
 
+@router.post("/change-password")
+def change_password(
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(req.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    current_user.hashed_password = get_password_hash(req.new_password)
+    db.add(current_user)
+    db.commit()
+    # The session cookie is keyed on user id, so it stays valid — no re-login needed.
+    return {"message": "Password changed"}
+
+
+@router.post("/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found for that email")
+    code = generate_numeric_code()
+    user.reset_code_hash = get_password_hash(code)
+    user.reset_code_expires_at = datetime.now(timezone.utc).replace(
+        tzinfo=None
+    ) + timedelta(minutes=settings.reset_code_expire_minutes)
+    db.add(user)
+    db.commit()
+    ok, err = notifier.send_password_reset_email(user.email, code)
+    if not ok:
+        raise HTTPException(
+            status_code=502, detail=f"Failed to send reset email: {err}"
+        )
+    return {"message": "Reset code sent — check your inbox."}
+
+
+@router.post("/reset-password")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email).first()
+    invalid = HTTPException(status_code=400, detail="Invalid or expired reset code")
+    if not user or not user.reset_code_hash or not user.reset_code_expires_at:
+        raise invalid
+    if datetime.now(timezone.utc).replace(tzinfo=None) > user.reset_code_expires_at:
+        raise invalid
+    if not verify_password(req.code, user.reset_code_hash):
+        raise invalid
+    user.hashed_password = get_password_hash(req.new_password)
+    user.reset_code_hash = None
+    user.reset_code_expires_at = None
+    db.add(user)
+    db.commit()
+    return {"message": "Password reset — you can now log in."}
+
+
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    comed_connected = db.query(ComedAccount).filter(ComedAccount.user_id == current_user.id).first() is not None
+    comed_connected = (
+        db.query(ComedAccount).filter(ComedAccount.user_id == current_user.id).first()
+        is not None
+    )
     return UserOut(
         id=current_user.id,
         email=current_user.email,
@@ -110,13 +187,15 @@ def comed_connect(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=503, detail="ComEd OAuth not configured")
     # Short-lived state token (10 min) to bind callback to this user
     state = create_access_token({"sub": str(current_user.id)}, expires_minutes=10)
-    params = urlencode({
-        "client_id": settings.comed_client_id,
-        "redirect_uri": settings.comed_redirect_uri,
-        "response_type": "code",
-        "scope": COMED_SCOPE,
-        "state": state,
-    })
+    params = urlencode(
+        {
+            "client_id": settings.comed_client_id,
+            "redirect_uri": settings.comed_redirect_uri,
+            "response_type": "code",
+            "scope": COMED_SCOPE,
+            "state": state,
+        }
+    )
     return RedirectResponse(url=f"{COMED_AUTH_URL}?{params}")
 
 
@@ -127,7 +206,9 @@ async def comed_callback(code: str, state: str, db: Session = Depends(get_db)):
         payload = decode_access_token(state)
         user_id = int(payload["sub"])
     except (JWTError, KeyError, ValueError):
-        raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired state parameter"
+        )
 
     user = db.get(User, user_id)
     if not user:
@@ -147,7 +228,9 @@ async def comed_callback(code: str, state: str, db: Session = Depends(get_db)):
             headers={"Accept": "application/json"},
         )
         if not resp.is_success:
-            raise HTTPException(status_code=502, detail=f"ComEd token exchange failed: {resp.text}")
+            raise HTTPException(
+                status_code=502, detail=f"ComEd token exchange failed: {resp.text}"
+            )
         token_data = resp.json()
 
     access_token = token_data.get("access_token", "")
@@ -157,7 +240,9 @@ async def comed_callback(code: str, state: str, db: Session = Depends(get_db)):
 
     expires_at = None
     if expires_in:
-        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=int(expires_in))
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+            seconds=int(expires_in)
+        )
 
     # Upsert ComedAccount with encrypted tokens
     account = db.query(ComedAccount).filter(ComedAccount.user_id == user_id).first()
@@ -182,8 +267,12 @@ async def comed_callback(code: str, state: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/comed/disconnect")
-def comed_disconnect(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    account = db.query(ComedAccount).filter(ComedAccount.user_id == current_user.id).first()
+def comed_disconnect(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    account = (
+        db.query(ComedAccount).filter(ComedAccount.user_id == current_user.id).first()
+    )
     if account:
         db.delete(account)
         db.commit()

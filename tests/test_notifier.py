@@ -4,6 +4,7 @@ Unit tests for app/services/notifier.py.
 External sends (Telegram, WhatsApp, Email) are mocked so no network calls
 or credentials are needed.
 """
+
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,78 +17,134 @@ from app.models import Subscription, AlertLog
 # _build_message
 # ---------------------------------------------------------------------------
 
+
 class TestBuildMessage:
     def test_low_alert_headline(self):
-        msg = _build_message(price=-1.0, threshold=0.0, dashboard_url="https://example.com", direction="low")
+        msg = _build_message(
+            price=-1.0,
+            threshold=0.0,
+            dashboard_url="https://example.com",
+            direction="low",
+        )
         assert "Low Price Alert" in msg
 
     def test_high_alert_headline(self):
-        msg = _build_message(price=12.0, threshold=10.0, dashboard_url="https://example.com", direction="high")
+        msg = _build_message(
+            price=12.0,
+            threshold=10.0,
+            dashboard_url="https://example.com",
+            direction="high",
+        )
         assert "High Price Alert" in msg
 
     def test_price_displayed(self):
-        msg = _build_message(price=3.25, threshold=5.0, dashboard_url="https://example.com", direction="low")
+        msg = _build_message(
+            price=3.25,
+            threshold=5.0,
+            dashboard_url="https://example.com",
+            direction="low",
+        )
         assert "3.25" in msg
 
     def test_threshold_in_label(self):
-        msg = _build_message(price=-1.0, threshold=0.0, dashboard_url="https://example.com", direction="low")
+        msg = _build_message(
+            price=-1.0,
+            threshold=0.0,
+            dashboard_url="https://example.com",
+            direction="low",
+        )
         assert "0.00" in msg
 
     def test_dashboard_url_included(self):
-        msg = _build_message(price=1.0, threshold=5.0, dashboard_url="https://test.example.com", direction="low")
+        msg = _build_message(
+            price=1.0,
+            threshold=5.0,
+            dashboard_url="https://test.example.com",
+            direction="low",
+        )
         assert "https://test.example.com" in msg
 
     def test_low_trigger_indicator_on_price(self):
         """Price below threshold → indicator appears on 5-Min Price line."""
-        msg = _build_message(price=-2.0, threshold=0.0, dashboard_url="https://x.com", direction="low")
+        msg = _build_message(
+            price=-2.0, threshold=0.0, dashboard_url="https://x.com", direction="low"
+        )
         lines = msg.splitlines()
         price_line = next(l for l in lines if "5-Min Price" in l)
         assert "←" in price_line
 
     def test_low_trigger_indicator_not_on_price_when_above(self):
         """Price above threshold → no indicator on 5-Min Price line."""
-        msg = _build_message(price=5.0, threshold=0.0, dashboard_url="https://x.com", direction="low",
-                             hourly_avg=-1.0)
+        msg = _build_message(
+            price=5.0,
+            threshold=0.0,
+            dashboard_url="https://x.com",
+            direction="low",
+            hourly_avg=-1.0,
+        )
         lines = msg.splitlines()
         price_line = next(l for l in lines if "5-Min Price" in l)
         assert "←" not in price_line
 
     def test_low_trigger_indicator_on_hourly_avg(self):
         """Hourly avg below threshold → indicator appears on Hour Avg line."""
-        msg = _build_message(price=5.0, threshold=0.0, dashboard_url="https://x.com",
-                             direction="low", hourly_avg=-0.5)
+        msg = _build_message(
+            price=5.0,
+            threshold=0.0,
+            dashboard_url="https://x.com",
+            direction="low",
+            hourly_avg=-0.5,
+        )
         lines = msg.splitlines()
         avg_line = next(l for l in lines if "Hour Avg" in l)
         assert "←" in avg_line
 
     def test_high_trigger_indicator_on_price(self):
         """Price above high threshold → indicator on price line."""
-        msg = _build_message(price=15.0, threshold=10.0, dashboard_url="https://x.com", direction="high")
+        msg = _build_message(
+            price=15.0, threshold=10.0, dashboard_url="https://x.com", direction="high"
+        )
         lines = msg.splitlines()
         price_line = next(l for l in lines if "5-Min Price" in l)
         assert "←" in price_line
 
     def test_high_trigger_indicator_on_hourly_avg(self):
-        msg = _build_message(price=5.0, threshold=10.0, dashboard_url="https://x.com",
-                             direction="high", hourly_avg=12.0)
+        msg = _build_message(
+            price=5.0,
+            threshold=10.0,
+            dashboard_url="https://x.com",
+            direction="high",
+            hourly_avg=12.0,
+        )
         lines = msg.splitlines()
         avg_line = next(l for l in lines if "Hour Avg" in l)
         assert "←" in avg_line
 
     def test_no_hourly_avg_shows_dash(self):
-        msg = _build_message(price=1.0, threshold=5.0, dashboard_url="https://x.com",
-                             direction="low", hourly_avg=None)
+        msg = _build_message(
+            price=1.0,
+            threshold=5.0,
+            dashboard_url="https://x.com",
+            direction="low",
+            hourly_avg=None,
+        )
         assert "Hour Avg:      —" in msg
 
     def test_hourly_avg_shown_when_provided(self):
-        msg = _build_message(price=1.0, threshold=5.0, dashboard_url="https://x.com",
-                             direction="low", hourly_avg=2.75)
+        msg = _build_message(
+            price=1.0,
+            threshold=5.0,
+            dashboard_url="https://x.com",
+            direction="low",
+            hourly_avg=2.75,
+        )
         assert "2.75" in msg
 
 
 # ---------------------------------------------------------------------------
 # check_and_notify — threshold and cooldown logic
 # ---------------------------------------------------------------------------
+
 
 def _make_sub(db, **kwargs) -> Subscription:
     defaults = dict(
@@ -110,6 +167,7 @@ def _make_sub(db, **kwargs) -> Subscription:
 def _seed_price(db, price: float, hours_ago: float = 0.0):
     """Insert a single price_5min row."""
     from sqlalchemy import text
+
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     offset_ms = int(hours_ago * 3600 * 1000)
     db.execute(
@@ -118,8 +176,11 @@ def _seed_price(db, price: float, hours_ago: float = 0.0):
             VALUES (:millis, :price, :now)
             ON CONFLICT (millis_utc) DO NOTHING
         """),
-        {"millis": now_ms - offset_ms, "price": price,
-         "now": datetime.now(timezone.utc)},
+        {
+            "millis": now_ms - offset_ms,
+            "price": price,
+            "now": datetime.now(timezone.utc),
+        },
     )
     db.commit()
 
@@ -131,8 +192,11 @@ class TestCheckAndNotify:
         _make_sub(db, telegram_chat_id="111", threshold_cents=5.0)
         _seed_price(db, price=3.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=3.0)
 
         mock_tg.assert_called_once()
@@ -142,9 +206,28 @@ class TestCheckAndNotify:
         _make_sub(db, telegram_chat_id="222", threshold_cents=0.0)
         _seed_price(db, price=5.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=5.0)
+
+        mock_tg.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_low_uses_hour_average_not_spot(self, db):
+        """A brief 5-min spot dip must NOT alert when the hour average is above
+        the threshold — alerts track the current hour's price, not the spot."""
+        _make_sub(db, telegram_chat_id="hravg", threshold_cents=5.0)
+        _seed_price(db, price=9.0)  # current-hour average ≈ 9¢ (above threshold)
+
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
+            await check_and_notify(db, current_price=1.0)  # spot dips to 1¢
 
         mock_tg.assert_not_called()
 
@@ -153,19 +236,27 @@ class TestCheckAndNotify:
         _make_sub(db, telegram_chat_id="333", threshold_cents=3.0)
         _seed_price(db, price=3.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=3.0)
 
         mock_tg.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_sends_high_alert(self, db):
-        _make_sub(db, telegram_chat_id="444", threshold_cents=0.0, high_threshold_cents=10.0)
+        _make_sub(
+            db, telegram_chat_id="444", threshold_cents=0.0, high_threshold_cents=10.0
+        )
         _seed_price(db, price=12.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=12.0)
 
         mock_tg.assert_called_once()
@@ -179,12 +270,16 @@ class TestCheckAndNotify:
         now = datetime.now(timezone.utc)
         # last_alerted_at = 30 minutes ago, still within the same hour
         last_alert = now.replace(minute=0, second=0, microsecond=0)  # top of this hour
-        _make_sub(db, telegram_chat_id="555", threshold_cents=5.0,
-                  last_alerted_at=last_alert)
+        _make_sub(
+            db, telegram_chat_id="555", threshold_cents=5.0, last_alerted_at=last_alert
+        )
         _seed_price(db, price=1.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=1.0)
 
         mock_tg.assert_not_called()
@@ -193,13 +288,22 @@ class TestCheckAndNotify:
     async def test_alert_fires_in_new_calendar_hour(self, db):
         """If last alert was in the PREVIOUS hour, alert fires again."""
         now = datetime.now(timezone.utc)
-        previous_hour = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
-        _make_sub(db, telegram_chat_id="666", threshold_cents=5.0,
-                  last_alerted_at=previous_hour)
+        previous_hour = now.replace(minute=0, second=0, microsecond=0) - timedelta(
+            hours=1
+        )
+        _make_sub(
+            db,
+            telegram_chat_id="666",
+            threshold_cents=5.0,
+            last_alerted_at=previous_hour,
+        )
         _seed_price(db, price=1.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=1.0)
 
         mock_tg.assert_called_once()
@@ -209,8 +313,11 @@ class TestCheckAndNotify:
         _make_sub(db, telegram_chat_id="777", threshold_cents=5.0, active=False)
         _seed_price(db, price=1.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             await check_and_notify(db, current_price=1.0)
 
         mock_tg.assert_not_called()
@@ -221,8 +328,11 @@ class TestCheckAndNotify:
         _seed_price(db, price=1.0)
         assert sub.last_alerted_at is None
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")):
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ):
             await check_and_notify(db, current_price=1.0)
 
         db.refresh(sub)
@@ -233,8 +343,11 @@ class TestCheckAndNotify:
         sub = _make_sub(db, telegram_chat_id="999", threshold_cents=5.0)
         _seed_price(db, price=1.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(False, "network error")):
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(False, "network error"),
+        ):
             await check_and_notify(db, current_price=1.0)
 
         db.refresh(sub)
@@ -246,8 +359,11 @@ class TestCheckAndNotify:
         _make_sub(db, telegram_chat_id="101010", threshold_cents=5.0, email=None)
         _seed_price(db, price=1.0)
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")):
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ):
             await check_and_notify(db, current_price=1.0)
 
         logs = db.query(AlertLog).all()
@@ -263,17 +379,22 @@ class TestCheckAndNotify:
         # by inserting several price rows for the current hour
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         from sqlalchemy import text
+
         for i in range(3):
             db.execute(
-                text("INSERT INTO price_5min (millis_utc, price_cents, recorded_at) "
-                     "VALUES (:m, :p, :n) ON CONFLICT (millis_utc) DO NOTHING"),
-                {"m": now_ms - i * 60000, "p": 1.0,
-                 "n": datetime.now(timezone.utc)},
+                text(
+                    "INSERT INTO price_5min (millis_utc, price_cents, recorded_at) "
+                    "VALUES (:m, :p, :n) ON CONFLICT (millis_utc) DO NOTHING"
+                ),
+                {"m": now_ms - i * 60000, "p": 1.0, "n": datetime.now(timezone.utc)},
             )
         db.commit()
 
-        with patch("app.services.notifier._send_telegram", new_callable=AsyncMock,
-                   return_value=(True, "")) as mock_tg:
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
             # 5-min price is 5.0 (above threshold 2.0), but hourly avg ~1.0 (below)
             await check_and_notify(db, current_price=5.0)
 
@@ -281,14 +402,29 @@ class TestCheckAndNotify:
 
     @pytest.mark.asyncio
     async def test_multiple_channels_all_called(self, db):
-        _make_sub(db, email="a@b.com", telegram_chat_id="3030",
-                  whatsapp_number="+13125550000", threshold_cents=5.0)
+        _make_sub(
+            db,
+            email="a@b.com",
+            telegram_chat_id="3030",
+            whatsapp_number="+13125550000",
+            threshold_cents=5.0,
+        )
         _seed_price(db, price=1.0)
 
         with (
-            patch("app.services.notifier._send_telegram", new_callable=AsyncMock, return_value=(True, "")) as mock_tg,
-            patch("app.services.notifier._send_whatsapp", new_callable=AsyncMock, return_value=(True, "")) as mock_wa,
-            patch("app.services.notifier._send_email", return_value=(True, "")) as mock_em,
+            patch(
+                "app.services.notifier._send_telegram",
+                new_callable=AsyncMock,
+                return_value=(True, ""),
+            ) as mock_tg,
+            patch(
+                "app.services.notifier._send_whatsapp",
+                new_callable=AsyncMock,
+                return_value=(True, ""),
+            ) as mock_wa,
+            patch(
+                "app.services.notifier._send_email", return_value=(True, "")
+            ) as mock_em,
         ):
             await check_and_notify(db, current_price=1.0)
 

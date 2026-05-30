@@ -2,6 +2,7 @@
 Integration tests for GET /api/prices/* endpoints.
 Uses FastAPI TestClient + in-memory SQLite — no network required.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -11,6 +12,7 @@ from sqlalchemy import text
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _insert_price(db, millis_utc: int, price_cents: float):
     db.execute(
@@ -42,6 +44,7 @@ NOW_MS = int(datetime.now(timezone.utc).timestamp() * 1000)
 # GET /health
 # ---------------------------------------------------------------------------
 
+
 class TestHealth:
     def test_health_ok(self, client):
         r = client.get("/health")
@@ -52,6 +55,7 @@ class TestHealth:
 # ---------------------------------------------------------------------------
 # GET /api/prices/current
 # ---------------------------------------------------------------------------
+
 
 class TestCurrentPrice:
     def test_503_when_no_data(self, client):
@@ -79,6 +83,7 @@ class TestCurrentPrice:
 # GET /api/prices/5min
 # ---------------------------------------------------------------------------
 
+
 class TestPrices5Min:
     def test_empty_db_returns_empty_list(self, client):
         r = client.get("/api/prices/5min")
@@ -86,8 +91,12 @@ class TestPrices5Min:
         assert r.json() == []
 
     def test_returns_rows_within_days_window(self, client, db):
-        recent_ms = int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp() * 1000)
-        old_ms = int((datetime.now(timezone.utc) - timedelta(days=8)).timestamp() * 1000)
+        recent_ms = int(
+            (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp() * 1000
+        )
+        old_ms = int(
+            (datetime.now(timezone.utc) - timedelta(days=8)).timestamp() * 1000
+        )
         _insert_price(db, recent_ms, 3.0)
         _insert_price(db, old_ms, 1.0)
         data = client.get("/api/prices/5min?days=7").json()
@@ -110,6 +119,7 @@ class TestPrices5Min:
 # ---------------------------------------------------------------------------
 # GET /api/prices/hourly
 # ---------------------------------------------------------------------------
+
 
 class TestPricesHourly:
     def test_empty_db_returns_empty_list(self, client):
@@ -136,6 +146,7 @@ class TestPricesHourly:
 # ---------------------------------------------------------------------------
 # GET /api/prices/stats
 # ---------------------------------------------------------------------------
+
 
 class TestPricesStats:
     def test_nulls_when_no_data(self, client):
@@ -165,7 +176,12 @@ class TestPricesStats:
 
     def test_hourly_avg_in_stats(self, client, db):
         # Insert a few rows within the current hour
-        base_ms = int(datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0).timestamp() * 1000)
+        base_ms = int(
+            datetime.now(timezone.utc)
+            .replace(minute=0, second=0, microsecond=0)
+            .timestamp()
+            * 1000
+        )
         for i in range(3):
             _insert_price(db, base_ms + i * 60_000, 6.0)
         data = client.get("/api/prices/stats").json()
@@ -175,6 +191,7 @@ class TestPricesStats:
 # ---------------------------------------------------------------------------
 # GET /api/prices/daily-summary
 # ---------------------------------------------------------------------------
+
 
 class TestDailySummary:
     def test_returns_list(self, client):
@@ -199,3 +216,37 @@ class TestDailySummary:
         for entry in data:
             assert entry["min_price"] is None
             assert entry["max_price"] is None
+
+
+# ---------------------------------------------------------------------------
+# Time-range window (start/end epoch ms) — drives chart presets + custom ranges
+# ---------------------------------------------------------------------------
+
+
+class TestRangeWindow:
+    def test_5min_start_end_filters(self, client, db):
+        now = int(datetime.now(timezone.utc).timestamp() * 1000)
+        h = 3_600_000
+        _insert_price(db, now - 10 * h, 1.0)
+        _insert_price(db, now - 5 * h, 2.0)
+        _insert_price(db, now - 1 * h, 3.0)
+        # Window that includes only the middle (-5h) point.
+        r = client.get(
+            f"/api/prices/5min?start={now - 10 * h + 1}&end={now - 5 * h + 1}"
+        )
+        assert r.status_code == 200
+        assert [row["price_cents"] for row in r.json()] == [2.0]
+
+    def test_hourly_start_end_filters(self, client, db):
+        now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        dt10, dt5, dt1 = (now - timedelta(hours=n) for n in (10, 5, 1))
+        _insert_hourly(db, dt10.replace(tzinfo=None), 1.0)
+        _insert_hourly(db, dt5.replace(tzinfo=None), 2.0)
+        _insert_hourly(db, dt1.replace(tzinfo=None), 3.0)
+        # Straddle only the -5h point (offsets avoid landing exactly on a stored
+        # value, which under SQLite's text-datetime compare is order-ambiguous).
+        start = int(dt5.timestamp() * 1000) - 60_000
+        end = int(dt5.timestamp() * 1000) + 60_000
+        r = client.get(f"/api/prices/hourly?start={start}&end={end}")
+        assert r.status_code == 200
+        assert [row["avg_price_cents"] for row in r.json()] == [2.0]

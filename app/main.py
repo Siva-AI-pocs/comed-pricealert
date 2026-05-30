@@ -1,12 +1,18 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
+from app.services.scheduler import create_scheduler
+
+# Used as a cache-buster query string on static assets. Changes every container
+# restart, so a redeploy invalidates stale JS/CSS in browsers and Cloudflare.
+STATIC_VERSION = str(int(time.time()))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,19 +25,25 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    yield
+    scheduler = create_scheduler()
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="ComEd Price Alert", lifespan=lifespan)
 
 # API routers
-from app.api import auth, decision, internal, prices, subscriptions  # noqa: E402
+from app.api import auth, decision, internal, prices, subscriptions, usage  # noqa: E402
 
 app.include_router(auth.router)
 app.include_router(prices.router)
 app.include_router(subscriptions.router)
 app.include_router(decision.router)
 app.include_router(internal.router)
+app.include_router(usage.router)
 
 
 @app.get("/health")
@@ -43,16 +55,22 @@ def health():
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+def _render_with_version(filename: str) -> HTMLResponse:
+    html = (STATIC_DIR / filename).read_text(encoding="utf-8")
+    html = html.replace("{{STATIC_VERSION}}", STATIC_VERSION)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/")
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return _render_with_version("index.html")
 
 
 @app.get("/privacy")
 def privacy():
-    return FileResponse(STATIC_DIR / "privacy.html")
+    return _render_with_version("privacy.html")
 
 
 @app.get("/terms")
 def terms():
-    return FileResponse(STATIC_DIR / "terms.html")
+    return _render_with_version("terms.html")

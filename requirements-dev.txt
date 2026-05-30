@@ -1,4 +1,8 @@
 # Dev-only tools (not needed at runtime / on Render).
-# Install into your venv so the Claude Code format-on-edit hook is live:
+# Install into your venv so the Claude Code format-on-edit hook + test suite work:
 #   pip install -r requirements-dev.txt
 ruff==0.15.15
+
+# Test suite (pytest is NOT a runtime dep, so it lives here, not requirements.txt)
+pytest==9.0.3
+pytest-asyncio==1.4.0

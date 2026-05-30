@@ -38,6 +38,7 @@ function toggleTheme() {
   // Rebuild charts so colors update
   init5MinChart();
   initHourlyChart();
+  if (currentUser) { initUsageChart(); loadUsageInsights(); }
 }
 
 // Read a CSS variable resolved value from the document root
@@ -48,8 +49,20 @@ function cssVar(name) {
 // ── Chart state ──────────────────────────────────────────────────────────────
 let chart5min   = null;
 let chartHourly = null;
-let range5min   = 1;
-let rangeHourly = 1;
+
+// Per-chart time-range drill-down. Each key holds either a preset {hours} window
+// or a custom {startMs,endMs} window; renderers turn that into ?start=&end= (ms).
+const RANGE_PRESETS = [['1h',1],['4h',4],['12h',12],['24h',24],['48h',48],['72h',72],['7d',168],['30d',720]];
+const chartRange = {
+  '5min':     { hours: 24 },
+  'hourly':   { hours: 24 },
+  'usage':    { hours: 720 },
+  'insights': { hours: 720 },
+};
+function chartRenderer(key) {
+  return { '5min': init5MinChart, 'hourly': initHourlyChart,
+           'usage': initUsageChart, 'insights': loadUsageInsights }[key];
+}
 
 // Called each time a chart is built so colors match current theme
 function chartDefaults() {
@@ -67,6 +80,10 @@ function chartDefaults() {
         borderWidth: 1,
         titleColor: cssVar('--chart-tooltip-title'),
         bodyColor: cssVar('--chart-tooltip-body'),
+      },
+      zoom: {
+        zoom: { drag: { enabled: true, backgroundColor: 'rgba(99,102,241,0.15)' }, mode: 'x' },
+        pan: { enabled: false },
       },
     },
     scales: {
@@ -103,19 +120,79 @@ function zeroAnnotation() {
   };
 }
 
+// ── Per-chart range controls (presets + custom + drag-zoom) ──────────────────
+function rangeWindow(key) {
+  const r = chartRange[key];
+  if (r.startMs != null && r.endMs != null) return { start: r.startMs, end: r.endMs };
+  const end = Date.now();
+  return { start: end - r.hours * 3600e3, end };
+}
+function rangeParams(key) {
+  const { start, end } = rangeWindow(key);
+  return `start=${Math.round(start)}&end=${Math.round(end)}`;
+}
+function timeUnit(key) {
+  const { start, end } = rangeWindow(key);
+  return (end - start) / 3600e3 <= 48 ? 'hour' : 'day';
+}
+function mountRangeControls(key) {
+  const bar = document.getElementById('range-' + key);
+  if (!bar) return;
+  const r = chartRange[key];
+  const isCustom = r.startMs != null;
+  bar.innerHTML =
+    RANGE_PRESETS.map(([label, hours]) =>
+      `<button class="range-btn${!isCustom && r.hours === hours ? ' active' : ''}" onclick="setChartRange('${key}',${hours},this)">${label}</button>`
+    ).join('') +
+    `<button class="range-btn${isCustom ? ' active' : ''}" onclick="toggleCustom('${key}')">Custom</button>`;
+  const c = document.getElementById('custom-' + key);
+  if (c && !c.dataset.built) {
+    c.innerHTML =
+      `From <input type="datetime-local" id="cstart-${key}"> ` +
+      `To <input type="datetime-local" id="cend-${key}"> ` +
+      `<button class="range-btn" onclick="applyCustomRange('${key}')">Apply</button>`;
+    c.dataset.built = '1';
+  }
+}
+function setChartRange(key, hours, btn) {
+  chartRange[key] = { hours };
+  const c = document.getElementById('custom-' + key);
+  if (c) c.style.display = 'none';
+  mountRangeControls(key);
+  chartRenderer(key)();
+}
+function toggleCustom(key) {
+  const c = document.getElementById('custom-' + key);
+  if (c) c.style.display = c.style.display === 'none' ? '' : 'none';
+}
+function applyCustomRange(key) {
+  const sv = document.getElementById('cstart-' + key).value;
+  const ev = document.getElementById('cend-' + key).value;
+  if (!sv || !ev) return;
+  const startMs = new Date(sv).getTime();
+  const endMs = new Date(ev).getTime();
+  if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) return;
+  chartRange[key] = { startMs, endMs };
+  mountRangeControls(key);
+  chartRenderer(key)();
+}
+function attachZoomReset(canvasId, chart) {
+  const cv = document.getElementById(canvasId);
+  if (cv) cv.ondblclick = () => chart.resetZoom();
+}
+
 // ── 5-Min Chart ──────────────────────────────────────────────────────────────
 async function init5MinChart() {
-  const url = range5min === 1 ? '/api/prices/5min?today=true' : `/api/prices/5min?days=${range5min}`;
-  const data = await fetchJSON(url);
+  mountRangeControls('5min');
+  const data = await fetchJSON('/api/prices/5min?' + rangeParams('5min')) || [];
   const labels  = data.map(d => new Date(d.millis_utc));
   const values  = data.map(d => d.price_cents);
-  const colors  = values.map(priceColor);
 
   const ctx = document.getElementById('chart5min').getContext('2d');
   if (chart5min) chart5min.destroy();
 
   const merged = mergeDeep({}, chartDefaults(), zeroAnnotation(), {
-    scales: { x: { time: { unit: 'hour', displayFormats: { hour: 'ha', day: 'MMM d' } } } },
+    scales: { x: { time: { unit: timeUnit('5min'), displayFormats: { hour: 'ha', day: 'MMM d' } } } },
   });
 
   chart5min = new Chart(ctx, {
@@ -142,13 +219,14 @@ async function init5MinChart() {
     },
     options: merged,
   });
+  attachZoomReset('chart5min', chart5min);
 }
 
 // ── Hourly Chart ─────────────────────────────────────────────────────────────
 async function initHourlyChart() {
-  const url = rangeHourly === 1 ? '/api/prices/hourly?today=true' : `/api/prices/hourly?days=${rangeHourly}`;
-  const data = await fetchJSON(url);
-  const labels = data.map(d => new Date(d.hour_utc));
+  mountRangeControls('hourly');
+  const data = await fetchJSON('/api/prices/hourly?' + rangeParams('hourly')) || [];
+  const labels = data.map(d => new Date(d.hour_utc + 'Z'));
   const values = data.map(d => d.avg_price_cents);
   const colors = values.map(p => priceColor(p).replace('var(', '').replace(')', ''));
 
@@ -172,7 +250,7 @@ async function initHourlyChart() {
   if (chartHourly) chartHourly.destroy();
 
   const merged = mergeDeep({}, chartDefaults(), zeroAnnotation(), {
-    scales: { x: { time: { unit: 'hour', displayFormats: { hour: 'ha', day: 'MMM d' } } } },
+    scales: { x: { time: { unit: timeUnit('hourly'), displayFormats: { hour: 'ha', day: 'MMM d' } } } },
   });
 
   chartHourly = new Chart(ctx, {
@@ -188,21 +266,9 @@ async function initHourlyChart() {
     },
     options: merged,
   });
+  attachZoomReset('chartHourly', chartHourly);
 }
 
-// ── Range toggle ─────────────────────────────────────────────────────────────
-function setRange(chart, days, btn) {
-  const parent = btn.parentElement;
-  parent.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if (chart === '5min') {
-    range5min = days;
-    init5MinChart();
-  } else {
-    rangeHourly = days;
-    initHourlyChart();
-  }
-}
 
 // ── Stats bar ────────────────────────────────────────────────────────────────
 async function updateStats() {
@@ -336,8 +402,6 @@ function updateAuthUI() {
   const subForm   = document.getElementById('subscribeFormWrapper');
   const subLoginP = document.getElementById('subscribeLoginPrompt');
   const comedSec  = document.getElementById('comedSection');
-  const comedConn = document.getElementById('comedConnected');
-  const comedDisc = document.getElementById('comedDisconnected');
 
   if (currentUser) {
     loggedOut.style.display = 'none';
@@ -348,13 +412,10 @@ function updateAuthUI() {
     subForm.style.display   = '';
     subLoginP.style.display = 'none';
     comedSec.style.display  = '';
-    if (currentUser.comed_connected) {
-      comedConn.style.display = '';
-      comedDisc.style.display = 'none';
-    } else {
-      comedConn.style.display = 'none';
-      comedDisc.style.display = '';
-    }
+    // Usage / insights card visibility is decided by their loaders based on data.
+    initUsageChart();
+    loadUsageInsights();
+    loadUsageMeters();
   } else {
     loggedOut.style.display = '';
     loggedIn.style.display  = 'none';
@@ -363,6 +424,9 @@ function updateAuthUI() {
     subForm.style.display   = 'none';
     subLoginP.style.display = '';
     comedSec.style.display  = 'none';
+    // Hide all usage-dependent UI when logged out.
+    ['usageChartCard', 'usagePriceCard', 'savingsCard', 'usageCompareWidget', 'usageSavingsNav']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
   }
 }
 
@@ -370,16 +434,36 @@ function showAuthModal(mode) {
   document.getElementById('authModal').style.display = '';
   document.getElementById('modalLoginForm').style.display    = mode === 'login' ? '' : 'none';
   document.getElementById('modalRegisterForm').style.display = mode === 'register' ? '' : 'none';
-  document.getElementById('loginMsg').textContent = '';
-  document.getElementById('regMsg').textContent   = '';
+  document.getElementById('modalForgotForm').style.display   = mode === 'forgot' ? '' : 'none';
+  document.getElementById('loginMsg').textContent  = '';
+  document.getElementById('regMsg').textContent    = '';
+  document.getElementById('forgotMsg').textContent = '';
+  // Reset the forgot flow back to step 1 (request a code) each time it opens.
+  if (mode === 'forgot') {
+    document.getElementById('forgotResetFields').style.display = 'none';
+    document.getElementById('forgotSendBtn').disabled = false;
+  }
 }
 
 function closeAuthModal() {
   document.getElementById('authModal').style.display = 'none';
 }
 
+function showChangePwModal() {
+  ['changeOldPassword', 'changeNewPassword', 'changeConfirmPassword'].forEach((id) => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('changePwMsg').textContent = '';
+  document.getElementById('changePwModal').style.display = '';
+}
+
+function closeChangePwModal() {
+  document.getElementById('changePwModal').style.display = 'none';
+}
+
 function closeModalOnOverlay(event) {
   if (event.target === document.getElementById('authModal')) closeAuthModal();
+  if (event.target === document.getElementById('changePwModal')) closeChangePwModal();
 }
 
 async function handleLogin() {
@@ -442,27 +526,337 @@ async function handleLogout() {
   updateAuthUI();
 }
 
-function handleComedConnect() {
-  window.location.href = '/auth/comed/connect';
-}
-
-async function handleComedDisconnect() {
-  if (!confirm('Disconnect your ComEd account?')) return;
-  await fetch('/auth/comed/disconnect', { method: 'DELETE' });
-  currentUser = await (await fetch('/auth/me')).json();
-  updateAuthUI();
-}
-
-function checkComedCallback() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('comed') === 'connected') {
-    const banner = document.createElement('div');
-    banner.className = 'comed-success-banner';
-    banner.textContent = 'ComEd account connected successfully!';
-    document.body.insertBefore(banner, document.body.firstChild);
-    setTimeout(() => banner.remove(), 5000);
-    history.replaceState({}, '', '/');
+async function handleChangePassword() {
+  const oldPassword = document.getElementById('changeOldPassword').value;
+  const newPassword = document.getElementById('changeNewPassword').value;
+  const confirm     = document.getElementById('changeConfirmPassword').value;
+  const msg         = document.getElementById('changePwMsg');
+  const btn         = document.getElementById('changePwBtn');
+  msg.textContent = '';
+  if (newPassword.length < 8) {
+    msg.textContent = 'New password must be at least 8 characters.';
+    msg.className = 'form-msg error';
+    return;
   }
+  if (newPassword !== confirm) {
+    msg.textContent = 'New passwords do not match.';
+    msg.className = 'form-msg error';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    });
+    if (resp.ok) {
+      msg.textContent = 'Password changed successfully.';
+      msg.className = 'form-msg success';
+      setTimeout(closeChangePwModal, 1200);
+    } else {
+      const err = await resp.json();
+      msg.textContent = err.detail || 'Could not change password.';
+      msg.className = 'form-msg error';
+    }
+  } catch {
+    msg.textContent = 'Network error. Please try again.';
+    msg.className = 'form-msg error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handleForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msg   = document.getElementById('forgotMsg');
+  const btn   = document.getElementById('forgotSendBtn');
+  msg.textContent = '';
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      msg.textContent = data.message || 'Reset code sent — check your inbox.';
+      msg.className = 'form-msg success';
+      document.getElementById('forgotResetFields').style.display = '';
+    } else {
+      msg.textContent = data.detail || 'Could not send reset code.';
+      msg.className = 'form-msg error';
+      btn.disabled = false;
+    }
+  } catch {
+    msg.textContent = 'Network error. Please try again.';
+    msg.className = 'form-msg error';
+    btn.disabled = false;
+  }
+}
+
+async function handleResetPassword() {
+  const email       = document.getElementById('forgotEmail').value.trim();
+  const code        = document.getElementById('forgotCode').value.trim();
+  const newPassword = document.getElementById('forgotNewPassword').value;
+  const confirm     = document.getElementById('forgotConfirmPassword').value;
+  const msg         = document.getElementById('forgotMsg');
+  const btn         = document.getElementById('forgotResetBtn');
+  msg.textContent = '';
+  if (newPassword.length < 8) {
+    msg.textContent = 'New password must be at least 8 characters.';
+    msg.className = 'form-msg error';
+    return;
+  }
+  if (newPassword !== confirm) {
+    msg.textContent = 'New passwords do not match.';
+    msg.className = 'form-msg error';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, new_password: newPassword }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      msg.textContent = (data.message || 'Password reset.') + ' Redirecting to login…';
+      msg.className = 'form-msg success';
+      setTimeout(() => showAuthModal('login'), 1200);
+    } else {
+      msg.textContent = data.detail || 'Could not reset password.';
+      msg.className = 'form-msg error';
+    }
+  } catch {
+    msg.textContent = 'Network error. Please try again.';
+    msg.className = 'form-msg error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Usage upload + chart ─────────────────────────────────────────────────────
+let chartUsage = null;
+
+async function handleUsageUpload(event) {
+  event.preventDefault();
+  const input = document.getElementById('usageFileInput');
+  const btn   = document.getElementById('usageUploadBtn');
+  const msg   = document.getElementById('usageUploadMsg');
+  const f     = input.files[0];
+  if (!f) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  msg.textContent = '';
+  msg.className = 'form-msg';
+
+  const form = new FormData();
+  form.append('file', f);
+  try {
+    const resp = await fetch('/api/usage/upload', { method: 'POST', body: form });
+    const data = await resp.json();
+    if (resp.ok) {
+      msg.textContent = `Imported ${data.intervals_inserted} intervals from ${data.range_start_utc?.slice(0,10) || '?'} to ${data.range_end_utc?.slice(0,10) || '?'}.`;
+      msg.className = 'form-msg success';
+      input.value = '';
+      await Promise.all([initUsageChart(), loadUsageInsights(), loadUsageMeters()]);
+    } else {
+      msg.textContent = data.detail || 'Upload failed.';
+      msg.className = 'form-msg error';
+    }
+  } catch {
+    msg.textContent = 'Network error.';
+    msg.className = 'form-msg error';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload';
+  }
+}
+
+async function loadUsageMeters() {
+  if (!currentUser) return;
+  const meters = await fetchJSON('/api/usage/meters');
+  const wrap   = document.getElementById('usageMetersWrapper');
+  const table  = document.getElementById('usageMetersTable');
+  if (!meters || meters.length === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  const rows = meters.map(m => `
+    <tr>
+      <td>${m.espi_usage_point_id}</td>
+      <td>${m.service_kind}</td>
+      <td>${m.interval_count}</td>
+      <td>${new Date(m.created_at).toLocaleDateString()}</td>
+      <td><button class="unsub-btn" onclick="deleteMeter(${m.id})">Delete</button></td>
+    </tr>
+  `).join('');
+  table.innerHTML = `
+    <table>
+      <thead><tr><th>Usage Point</th><th>Kind</th><th>Intervals</th><th>First imported</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function deleteMeter(meterId) {
+  if (!confirm('Delete this meter and all its interval data?')) return;
+  await fetch(`/api/usage/meter/${meterId}`, { method: 'DELETE' });
+  await Promise.all([initUsageChart(), loadUsageMeters()]);
+}
+
+async function initUsageChart() {
+  if (!currentUser) return;
+  mountRangeControls('usage');
+  const data = await fetchJSON('/api/usage/hourly?' + rangeParams('usage')) || [];
+  const card   = document.getElementById('usageChartCard');
+  const canvas = document.getElementById('chartUsage');
+  if (!data || data.length === 0) {
+    card.style.display = 'none';
+    if (chartUsage) { chartUsage.destroy(); chartUsage = null; }
+    return;
+  }
+  card.style.display = '';
+  const labels = data.map(d => new Date(d.hour_utc + 'Z'));
+  const values = data.map(d => d.kwh);
+
+  const ctx = canvas.getContext('2d');
+  if (chartUsage) chartUsage.destroy();
+
+  const merged = mergeDeep({}, chartDefaults(), {
+    scales: {
+      x: { time: { unit: timeUnit('usage'), displayFormats: { hour: 'ha', day: 'MMM d' } } },
+      y: { ticks: { color: cssVar('--chart-tick'), callback: v => v.toFixed(2) + ' kWh' } },
+    },
+  });
+
+  chartUsage = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: '#6366f1cc',
+        borderRadius: 3,
+        borderSkipped: false,
+      }],
+    },
+    options: merged,
+  });
+  attachZoomReset('chartUsage', chartUsage);
+}
+
+// ── Usage vs price + savings insights ────────────────────────────────────────
+let chartUsagePrice = null;
+let shiftPct = 30;            // percent, mirrors #shiftPctSlider
+let shiftDebounce = null;
+
+const _usd = c => '$' + (c / 100).toFixed(2);
+
+function onShiftPctChange() {
+  const slider = document.getElementById('shiftPctSlider');
+  shiftPct = parseInt(slider.value, 10);
+  document.getElementById('shiftPctLabel').textContent = shiftPct + '%';
+  clearTimeout(shiftDebounce);
+  shiftDebounce = setTimeout(loadUsageInsights, 200);
+}
+
+async function loadUsageInsights() {
+  if (!currentUser) return;
+  mountRangeControls('insights');
+  const data = await fetchJSON(`/api/usage/insights?${rangeParams('insights')}&shiftable_pct=${(shiftPct / 100).toFixed(2)}`);
+  const priceCard = document.getElementById('usagePriceCard');
+  const savingsCard = document.getElementById('savingsCard');
+  if (!data || !data.hourly || data.hourly.length === 0) {
+    priceCard.style.display = 'none';
+    savingsCard.style.display = 'none';
+    document.getElementById('usageCompareWidget').style.display = 'none';
+    document.getElementById('usageSavingsNav').style.display = 'none';
+    if (chartUsagePrice) { chartUsagePrice.destroy(); chartUsagePrice = null; }
+    return;
+  }
+  priceCard.style.display = '';
+  savingsCard.style.display = '';
+
+  const labels = data.hourly.map(d => new Date(d.hour_utc + 'Z'));
+  const usage  = data.hourly.map(d => d.kwh);
+  const price  = data.hourly.map(d => d.price_cents);
+
+  const merged = mergeDeep({}, chartDefaults(), {
+    plugins: { legend: { display: true } },
+    scales: {
+      x: { time: { unit: timeUnit('insights'), displayFormats: { hour: 'ha', day: 'MMM d' } } },
+      y: { position: 'left', ticks: { color: cssVar('--chart-tick'), callback: v => v.toFixed(1) + ' kWh' } },
+      y1: {
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: { color: cssVar('--chart-tick'), callback: v => v.toFixed(0) + '¢' },
+      },
+    },
+  });
+
+  const ctx = document.getElementById('chartUsagePrice').getContext('2d');
+  if (chartUsagePrice) chartUsagePrice.destroy();
+  chartUsagePrice = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Usage (kWh)', data: usage, yAxisID: 'y',
+          backgroundColor: '#6366f1aa', borderRadius: 3, borderSkipped: false, order: 2 },
+        { type: 'line', label: 'Price (¢/kWh)', data: price, yAxisID: 'y1',
+          borderColor: '#ef4444', borderWidth: 2, tension: 0.2, pointRadius: 0, order: 1 },
+      ],
+    },
+    options: merged,
+  });
+  attachZoomReset('chartUsagePrice', chartUsagePrice);
+
+  const s = data.summary;
+  const pct = s.actual_cost_cents > 0 ? Math.round((s.shift_savings_cents / s.actual_cost_cents) * 100) : 0;
+  document.getElementById('savingsSummary').innerHTML =
+    `<div class="stat-value green">${_usd(s.shift_savings_cents)}</div>` +
+    `<div class="stat-label">est. savings on your usage (${pct}%)</div>` +
+    `<p class="hint" style="margin-top:8px">Shift ~${s.shiftable_kwh.toFixed(1)} kWh from peak to the cheapest hours: ` +
+    `${_usd(s.actual_cost_cents)} → ${_usd(s.optimized_cost_cents)}.</p>`;
+
+  const flatDelta = s.hourly_vs_flat_cents;
+  const verdict = flatDelta >= 0
+    ? `hourly pricing saved you <b>${_usd(flatDelta)}</b>`
+    : `hourly pricing cost <b>${_usd(-flatDelta)}</b> more`;
+  document.getElementById('billCompare').innerHTML =
+    `<div class="stat-label">Bill comparison</div>` +
+    `<p class="hint" style="margin-top:4px">On hourly pricing you paid <b>${_usd(s.actual_cost_cents)}</b>. ` +
+    `At a flat ${s.flat_rate_cents}¢/kWh you'd pay <b>${_usd(s.flat_cost_cents)}</b> — ${verdict}.</p>`;
+
+  // Top widget: flat vs hourly cost for the user's usage, click to jump to details.
+  const cheaper = flatDelta >= 0;
+  document.getElementById('usageCompareWidget').innerHTML =
+    `<div class="stat-card"><div class="stat-label">Your usage · hourly pricing</div>` +
+      `<div class="stat-value">${_usd(s.actual_cost_cents)}</div></div>` +
+    `<div class="stat-card"><div class="stat-label">Same usage · flat ${s.flat_rate_cents}¢/kWh</div>` +
+      `<div class="stat-value">${_usd(s.flat_cost_cents)}</div></div>` +
+    `<div class="stat-card ${cheaper ? 'green' : 'orange'}">` +
+      `<div class="stat-label">${cheaper ? 'Hourly pricing saved' : 'Hourly pricing cost extra'}</div>` +
+      `<div class="stat-value ${cheaper ? 'green' : 'orange'}">${_usd(Math.abs(flatDelta))}</div></div>` +
+    `<div class="stat-card"><div class="stat-label">Shift-to-cheap savings →</div>` +
+      `<div class="stat-value green">${_usd(s.shift_savings_cents)}</div></div>`;
+  document.getElementById('usageCompareWidget').style.display = '';
+  document.getElementById('usageSavingsNav').style.display = '';
+}
+
+function scrollToUsageComparison() {
+  const card = document.getElementById('usagePriceCard');
+  // If the comparison is live, jump to it; otherwise send the user to the
+  // upload card (no overlapping usage/price yet) so they know what to do.
+  const target = (card && card.style.display !== 'none')
+    ? card
+    : document.getElementById('comedSection');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Subscriptions table ──────────────────────────────────────────────────────
@@ -622,7 +1016,6 @@ function mergeDeep(target, ...sources) {
 // ── Init + auto-refresh ──────────────────────────────────────────────────────
 async function init() {
   initTheme();
-  checkComedCallback();
   await initAuth();
   await updateStats();
   await updateDecision();

@@ -21,6 +21,7 @@ def _build_message(
     hourly_avg: float | None = None,
 ) -> str:
     from zoneinfo import ZoneInfo
+
     COMED_TZ = ZoneInfo("America/Chicago")
     now_ct = datetime.now(COMED_TZ)
     ts = now_ct.strftime("%Y-%m-%d %I:%M %p CT")
@@ -29,15 +30,23 @@ def _build_message(
         headline = "⬆️ ComEd High Price Alert"
         label = f"above your {threshold:.2f}¢ high alert"
         price_tag = f"  ← {label}" if price >= threshold else ""
-        avg_tag = f"  ← {label}" if hourly_avg is not None and hourly_avg >= threshold else ""
+        avg_tag = (
+            f"  ← {label}" if hourly_avg is not None and hourly_avg >= threshold else ""
+        )
     else:
         headline = "⬇️ ComEd Low Price Alert"
         label = f"below your {threshold:.2f}¢ low alert"
         price_tag = f"  ← {label}" if price <= threshold else ""
-        avg_tag = f"  ← {label}" if hourly_avg is not None and hourly_avg <= threshold else ""
+        avg_tag = (
+            f"  ← {label}" if hourly_avg is not None and hourly_avg <= threshold else ""
+        )
 
     price_line = f"5-Min Price:   {price:.2f}¢/kWh{price_tag}"
-    avg_line = f"Hour Avg:      {hourly_avg:.2f}¢/kWh{avg_tag}" if hourly_avg is not None else "Hour Avg:      —"
+    avg_line = (
+        f"Hour Avg:      {hourly_avg:.2f}¢/kWh{avg_tag}"
+        if hourly_avg is not None
+        else "Hour Avg:      —"
+    )
 
     return (
         f"{headline}\n"
@@ -88,23 +97,12 @@ async def _send_whatsapp(to_number: str, message: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
-def _send_email(to_address: str, price: float, threshold: float, dashboard_url: str, direction: str = "low") -> tuple[bool, str]:
+def _send_smtp(
+    to_address: str, subject: str, plain: str, html: str
+) -> tuple[bool, str]:
+    """Generic transactional email sender. Returns (success, error_message)."""
     if not settings.smtp_user or not settings.smtp_password:
         return False, "SMTP credentials not configured"
-    subject = f"ComEd Price Alert: {price:.2f}¢/kWh"
-    plain = _build_message(price, threshold, dashboard_url, direction)
-    threshold_label = f"≥{threshold:.2f}¢/kWh" if direction == "high" else f"≤{threshold:.2f}¢/kWh"
-    html = f"""
-    <html><body>
-    <h2 style="color:{'green' if price <= 0 else 'orange'}">ComEd Price Alert!</h2>
-    <table style="font-size:16px;border-collapse:collapse">
-      <tr><td style="padding:6px 12px"><b>Current price</b></td><td style="padding:6px 12px;color:{'green' if price <= 0 else 'red'}">{price:.2f}¢/kWh</td></tr>
-      <tr><td style="padding:6px 12px"><b>Your threshold</b></td><td style="padding:6px 12px">{threshold_label}</td></tr>
-      <tr><td style="padding:6px 12px"><b>Time</b></td><td style="padding:6px 12px">{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</td></tr>
-    </table>
-    <p><a href="{dashboard_url}">View Dashboard</a></p>
-    </body></html>
-    """
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
@@ -122,26 +120,76 @@ def _send_email(to_address: str, price: float, threshold: float, dashboard_url: 
         return False, str(exc)
 
 
-def _log_alert(db: Session, sub_id: int, price: float, channel: str, success: bool, error: str) -> None:
-    db.add(AlertLog(
-        subscription_id=sub_id,
-        price_cents=price,
-        channel=channel,
-        sent_at=datetime.now(timezone.utc),
-        success=success,
-        error_msg=error or None,
-    ))
+def _send_email(
+    to_address: str,
+    price: float,
+    threshold: float,
+    dashboard_url: str,
+    direction: str = "low",
+) -> tuple[bool, str]:
+    subject = f"ComEd Price Alert: {price:.2f}¢/kWh"
+    plain = _build_message(price, threshold, dashboard_url, direction)
+    threshold_label = (
+        f"≥{threshold:.2f}¢/kWh" if direction == "high" else f"≤{threshold:.2f}¢/kWh"
+    )
+    html = f"""
+    <html><body>
+    <h2 style="color:{"green" if price <= 0 else "orange"}">ComEd Price Alert!</h2>
+    <table style="font-size:16px;border-collapse:collapse">
+      <tr><td style="padding:6px 12px"><b>Current price</b></td><td style="padding:6px 12px;color:{"green" if price <= 0 else "red"}">{price:.2f}¢/kWh</td></tr>
+      <tr><td style="padding:6px 12px"><b>Your threshold</b></td><td style="padding:6px 12px">{threshold_label}</td></tr>
+      <tr><td style="padding:6px 12px"><b>Time</b></td><td style="padding:6px 12px">{datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}</td></tr>
+    </table>
+    <p><a href="{dashboard_url}">View Dashboard</a></p>
+    </body></html>
+    """
+    return _send_smtp(to_address, subject, plain, html)
+
+
+def send_password_reset_email(to_address: str, code: str) -> tuple[bool, str]:
+    """Email a password-reset code. Returns (success, error_message)."""
+    minutes = settings.reset_code_expire_minutes
+    subject = "Your ComEd Price Alert password reset code"
+    plain = (
+        f"Your ComEd Price Alert password reset code is: {code}\n\n"
+        f"It is valid for {minutes} minutes. If you didn't request this, you can ignore this email.\n"
+    )
+    html = f"""
+    <html><body>
+    <h2>Password reset</h2>
+    <p>Your ComEd Price Alert password reset code is:</p>
+    <p style="font-size:28px;font-weight:bold;letter-spacing:4px">{code}</p>
+    <p>It is valid for {minutes} minutes. If you didn't request this, you can ignore this email.</p>
+    </body></html>
+    """
+    return _send_smtp(to_address, subject, plain, html)
+
+
+def _log_alert(
+    db: Session, sub_id: int, price: float, channel: str, success: bool, error: str
+) -> None:
+    db.add(
+        AlertLog(
+            subscription_id=sub_id,
+            price_cents=price,
+            channel=channel,
+            sent_at=datetime.now(timezone.utc),
+            success=success,
+            error_msg=error or None,
+        )
+    )
     db.commit()
 
 
 async def check_and_notify(db: Session, current_price: float) -> None:
     from sqlalchemy import text as sa_text
+
     now = datetime.now(timezone.utc)
     current_hour = now.replace(minute=0, second=0, microsecond=0)
 
     subs = db.query(Subscription).filter(Subscription.active == True).all()  # noqa: E712
 
-    dashboard_url = "https://comed-pricealert.onrender.com"
+    dashboard_url = settings.app_base_url
 
     # Fetch current hour average once for all alerts
     hourly_avg = db.execute(
@@ -157,20 +205,27 @@ async def check_and_notify(db: Session, current_price: float) -> None:
         len(subs),
     )
 
+    # Alert on the current HOUR's price (averaged), not the volatile 5-min spot —
+    # this is what the user sets a threshold against and avoids firing on brief
+    # 5-min dips/spikes. Fall back to the spot price only before any hourly data
+    # exists for the current hour (startup).
+    base_price = hourly_avg if hourly_avg is not None else current_price
+
     for sub in subs:
-        should_alert_low = (
-            current_price <= sub.threshold_cents
-            or (hourly_avg is not None and hourly_avg <= sub.threshold_cents)
-        )
-        should_alert_high = sub.high_threshold_cents is not None and (
-            current_price >= sub.high_threshold_cents
-            or (hourly_avg is not None and hourly_avg >= sub.high_threshold_cents)
+        should_alert_low = base_price <= sub.threshold_cents
+        should_alert_high = (
+            sub.high_threshold_cents is not None
+            and base_price >= sub.high_threshold_cents
         )
         if not (should_alert_low or should_alert_high):
             logger.debug(
                 "sub_id=%d skipped: price=%.2f not crossing low=%.2f high=%s",
-                sub.id, current_price, sub.threshold_cents,
-                f"{sub.high_threshold_cents:.2f}" if sub.high_threshold_cents else "none",
+                sub.id,
+                current_price,
+                sub.threshold_cents,
+                f"{sub.high_threshold_cents:.2f}"
+                if sub.high_threshold_cents
+                else "none",
             )
             continue
 
@@ -182,7 +237,8 @@ async def check_and_notify(db: Session, current_price: float) -> None:
             if last_alert_hour >= current_hour:
                 logger.info(
                     "sub_id=%d skipped: already alerted this hour (last_alerted_at=%s)",
-                    sub.id, sub.last_alerted_at,
+                    sub.id,
+                    sub.last_alerted_at,
                 )
                 continue
 
@@ -193,7 +249,9 @@ async def check_and_notify(db: Session, current_price: float) -> None:
             direction = "low"
             threshold_for_msg = sub.threshold_cents
 
-        message = _build_message(current_price, threshold_for_msg, dashboard_url, direction, hourly_avg)
+        message = _build_message(
+            current_price, threshold_for_msg, dashboard_url, direction, hourly_avg
+        )
         any_sent = False
 
         if sub.telegram_chat_id:
@@ -201,25 +259,48 @@ async def check_and_notify(db: Session, current_price: float) -> None:
             _log_alert(db, sub.id, current_price, "telegram", ok, err)
             if ok:
                 any_sent = True
-                logger.info("Telegram alert sent to chat_id=%s (price=%.2f, direction=%s)", sub.telegram_chat_id, current_price, direction)
+                logger.info(
+                    "Telegram alert sent to chat_id=%s (price=%.2f, direction=%s)",
+                    sub.telegram_chat_id,
+                    current_price,
+                    direction,
+                )
             else:
-                logger.warning("Telegram alert failed for chat_id=%s: %s", sub.telegram_chat_id, err)
+                logger.warning(
+                    "Telegram alert failed for chat_id=%s: %s",
+                    sub.telegram_chat_id,
+                    err,
+                )
 
         if sub.whatsapp_number:
             ok, err = await _send_whatsapp(sub.whatsapp_number, message)
             _log_alert(db, sub.id, current_price, "whatsapp", ok, err)
             if ok:
                 any_sent = True
-                logger.info("WhatsApp alert sent to %s (price=%.2f, direction=%s)", sub.whatsapp_number, current_price, direction)
+                logger.info(
+                    "WhatsApp alert sent to %s (price=%.2f, direction=%s)",
+                    sub.whatsapp_number,
+                    current_price,
+                    direction,
+                )
             else:
-                logger.warning("WhatsApp alert failed for %s: %s", sub.whatsapp_number, err)
+                logger.warning(
+                    "WhatsApp alert failed for %s: %s", sub.whatsapp_number, err
+                )
 
         if sub.email:
-            ok, err = _send_email(sub.email, current_price, threshold_for_msg, dashboard_url, direction)
+            ok, err = _send_email(
+                sub.email, current_price, threshold_for_msg, dashboard_url, direction
+            )
             _log_alert(db, sub.id, current_price, "email", ok, err)
             if ok:
                 any_sent = True
-                logger.info("Email alert sent to %s (price=%.2f, direction=%s)", sub.email, current_price, direction)
+                logger.info(
+                    "Email alert sent to %s (price=%.2f, direction=%s)",
+                    sub.email,
+                    current_price,
+                    direction,
+                )
             else:
                 logger.warning("Email alert failed for %s: %s", sub.email, err)
 
@@ -243,6 +324,8 @@ async def send_confirmation(sub: Subscription) -> None:
         if not ok:
             logger.warning("Confirmation WhatsApp failed: %s", err)
     if sub.email:
-        ok, err = _send_email(sub.email, sub.threshold_cents, sub.threshold_cents, "https://your-app.onrender.com")
+        ok, err = _send_email(
+            sub.email, sub.threshold_cents, sub.threshold_cents, settings.app_base_url
+        )
         if not ok:
             logger.warning("Confirmation email failed: %s", err)

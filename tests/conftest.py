@@ -5,11 +5,17 @@ Unit/integration tests use an in-memory SQLite database (StaticPool so a
 single connection is reused — required for :memory: DBs to survive across
 multiple sessions).  E2E tests are tagged @pytest.mark.e2e.
 """
+
 import os
 
 # Force SQLite in-memory BEFORE any app module is imported so pydantic-settings
 # picks it up.  Plain assignment (not setdefault) overrides shell env too.
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+
+# Force a non-HTTPS base URL so auth cookies are not marked Secure — otherwise the
+# TestClient (http://testserver) silently drops them and cookie-auth requests 401.
+# (A developer .env with APP_BASE_URL=https://… would otherwise break auth tests.)
+os.environ["APP_BASE_URL"] = "http://localhost"
 
 import pytest
 from sqlalchemy import create_engine
@@ -21,13 +27,16 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "e2e: live end-to-end tests against Render (requires network)")
+    config.addinivalue_line(
+        "markers", "e2e: live end-to-end tests against Render (requires network)"
+    )
     config.addinivalue_line("markers", "slow: intentionally slow tests")
 
 
 # ---------------------------------------------------------------------------
 # Database fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def test_engine():
@@ -43,6 +52,7 @@ def test_engine():
     )
     from app.database import Base
     import app.models  # noqa: F401 — register all ORM models with Base
+
     Base.metadata.create_all(bind=engine)
     yield engine
     engine.dispose()
@@ -60,6 +70,7 @@ def db(test_engine):
     session.rollback()
     # Delete all rows while connection is still open
     from app.database import Base
+
     for table in reversed(Base.metadata.sorted_tables):
         session.execute(table.delete())
     session.commit()
@@ -69,6 +80,7 @@ def db(test_engine):
 # ---------------------------------------------------------------------------
 # FastAPI TestClient fixture
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def client(db):
@@ -88,6 +100,7 @@ def client(db):
 # ---------------------------------------------------------------------------
 # Helper: seed price rows
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def seed_prices(db):

@@ -4,11 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ComEd Price Alert Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v={{STATIC_VERSION}}" />
   <!-- Chart.js + date adapter + annotation plugin -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
 
@@ -30,6 +32,8 @@
     </div>
     <div id="authLoggedIn" style="display:none">
       <span id="authUserEmail" class="auth-email"></span>
+      <button class="auth-btn" id="usageSavingsNav" onclick="scrollToUsageComparison()" style="display:none">📊 Usage savings</button>
+      <button class="auth-btn secondary" onclick="showChangePwModal()">Change password</button>
       <button class="auth-btn secondary" onclick="handleLogout()">Logout</button>
     </div>
   </div>
@@ -52,6 +56,7 @@
       </div>
       <button class="submit-btn" onclick="handleLogin()">Login</button>
       <div id="loginMsg" class="form-msg"></div>
+      <p class="auth-switch"><a href="#" onclick="showAuthModal('forgot'); return false;">Forgot password?</a></p>
       <p class="auth-switch">No account? <a href="#" onclick="showAuthModal('register'); return false;">Sign up</a></p>
     </div>
     <div id="modalRegisterForm" style="display:none">
@@ -68,6 +73,54 @@
       <div id="regMsg" class="form-msg"></div>
       <p class="auth-switch">Have an account? <a href="#" onclick="showAuthModal('login'); return false;">Login</a></p>
     </div>
+    <div id="modalForgotForm" style="display:none">
+      <h2>Reset password</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="forgotEmail" placeholder="you@example.com" />
+      </div>
+      <button class="submit-btn" onclick="handleForgotPassword()" id="forgotSendBtn">Send reset code</button>
+      <!-- Revealed after a code has been sent -->
+      <div id="forgotResetFields" style="display:none">
+        <div class="form-group">
+          <label>Reset code</label>
+          <input type="text" id="forgotCode" placeholder="6-digit code from email" inputmode="numeric" autocomplete="one-time-code" />
+        </div>
+        <div class="form-group">
+          <label>New password</label>
+          <input type="password" id="forgotNewPassword" placeholder="Min 8 characters" />
+        </div>
+        <div class="form-group">
+          <label>Confirm new password</label>
+          <input type="password" id="forgotConfirmPassword" placeholder="Re-enter new password" />
+        </div>
+        <button class="submit-btn" onclick="handleResetPassword()" id="forgotResetBtn">Reset password</button>
+      </div>
+      <div id="forgotMsg" class="form-msg"></div>
+      <p class="auth-switch">Remembered it? <a href="#" onclick="showAuthModal('login'); return false;">Login</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="changePwModal" class="modal-overlay" style="display:none" onclick="closeModalOnOverlay(event)">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeChangePwModal()">×</button>
+    <h2>Change password</h2>
+    <div class="form-group">
+      <label>Current password</label>
+      <input type="password" id="changeOldPassword" placeholder="Current password" />
+    </div>
+    <div class="form-group">
+      <label>New password</label>
+      <input type="password" id="changeNewPassword" placeholder="Min 8 characters" />
+    </div>
+    <div class="form-group">
+      <label>Confirm new password</label>
+      <input type="password" id="changeConfirmPassword" placeholder="Re-enter new password" />
+    </div>
+    <button class="submit-btn" onclick="handleChangePassword()" id="changePwBtn">Change password</button>
+    <div id="changePwMsg" class="form-msg"></div>
   </div>
 </div>
 
@@ -96,26 +149,61 @@
 
 <div id="decisionBanner" class="decision-banner" style="display:none"></div>
 
-<div class="charts-section">
+<!-- Top widget: your usage on flat vs hourly pricing (shown when insights exist) -->
+<div id="usageCompareWidget" class="stats-bar" style="display:none;cursor:pointer" title="View full usage comparison" onclick="scrollToUsageComparison()"></div>
+
+<!-- Unified charts: usage first (gated on data), then prices. Range bars are
+     mounted by JS (mountRangeControls). Drag to zoom, double-click to reset. -->
+<div class="charts-section" id="chartsSection">
+  <!-- My usage (shown only when usage data exists) -->
+  <div class="chart-card" id="usageChartCard" style="flex:1 1 100%;display:none">
+    <div class="chart-header">
+      <div class="chart-title">My Hourly Usage (kWh)</div>
+      <div class="range-toggle" id="range-usage"></div>
+    </div>
+    <div class="custom-range" id="custom-usage" style="display:none;padding:4px 0;font-size:12px;color:var(--muted)"></div>
+    <div class="chart-wrapper"><canvas id="chartUsage"></canvas></div>
+  </div>
+
+  <!-- Usage vs price (shown only when usage⋂price overlap exists) -->
+  <div class="chart-card" id="usagePriceCard" style="flex:2 1 480px;display:none">
+    <div class="chart-header">
+      <div class="chart-title">Usage vs Price</div>
+      <div class="range-toggle" id="range-insights"></div>
+    </div>
+    <div class="custom-range" id="custom-insights" style="display:none;padding:4px 0;font-size:12px;color:var(--muted)"></div>
+    <div class="chart-wrapper"><canvas id="chartUsagePrice"></canvas></div>
+  </div>
+
+  <!-- Savings (paired with usage-vs-price) -->
+  <div class="chart-card" id="savingsCard" style="flex:1 1 280px;display:none">
+    <div class="chart-title">Potential Savings</div>
+    <div id="savingsSummary"></div>
+    <div class="form-group" style="margin-top:14px">
+      <label>Shiftable peak load: <span id="shiftPctLabel">30%</span></label>
+      <input type="range" id="shiftPctSlider" min="0" max="100" step="5" value="30" oninput="onShiftPctChange()" />
+      <span class="hint">How much of your peak-hour usage you could move to the day's cheapest hours.</span>
+    </div>
+    <div id="billCompare" style="margin-top:14px"></div>
+  </div>
+
+  <!-- 5-minute prices (always) -->
   <div class="chart-card">
     <div class="chart-header">
       <div class="chart-title">5-Minute Prices (¢/kWh)</div>
-      <div class="range-toggle">
-        <button class="range-btn active" onclick="setRange('5min',1,this)">1D</button>
-        <button class="range-btn" onclick="setRange('5min',7,this)">7D</button>
-      </div>
+      <div class="range-toggle" id="range-5min"></div>
     </div>
+    <div class="custom-range" id="custom-5min" style="display:none;padding:4px 0;font-size:12px;color:var(--muted)"></div>
     <div class="chart-wrapper"><canvas id="chart5min"></canvas></div>
   </div>
 
+  <!-- Hourly averages (always) -->
   <div class="chart-card">
     <div class="chart-header">
       <div class="chart-title">Hourly Averages (¢/kWh)</div>
-      <div class="range-toggle">
-        <button class="range-btn active" onclick="setRange('hourly',1,this)">1D</button>
-        <button class="range-btn" onclick="setRange('hourly',7,this)">7D</button>
-      </div>
+      <div class="range-toggle" id="range-hourly"></div>
     </div>
+    <div class="custom-range" id="custom-hourly" style="display:none;padding:4px 0;font-size:12px;color:var(--muted)"></div>
     <div class="chart-wrapper"><canvas id="chartHourly"></canvas></div>
   </div>
 </div>
@@ -184,28 +272,28 @@
   </div>
 </div>
 
-<!-- ComEd Account Section (shown only when logged in) -->
+<!-- My Usage upload (shown only when logged in) -->
 <div class="comed-section" id="comedSection" style="display:none">
   <div class="comed-card">
-    <h2>ComEd Account</h2>
-    <div id="comedConnected" style="display:none">
-      <p class="success-text">Connected to ComEd Green Button data.</p>
-      <p style="color:var(--muted);font-size:13px">Your 15-minute interval usage data is accessible. You can disconnect at any time.</p>
-      <button class="unsub-btn" onclick="handleComedDisconnect()">Disconnect</button>
+    <h2>My ComEd Usage Data</h2>
+    <p>Upload a Green Button download from your ComEd account to chart your own usage alongside prices.</p>
+    <div class="comed-consent">
+      <strong>How to get your file:</strong>
+      <ol>
+        <li>Log in to <a href="https://secure.comed.com/MyAccount/MyService/Pages/UsageDataTool.aspx" target="_blank" rel="noopener">ComEd → My Usage Data</a></li>
+        <li>Choose <em>Green Button Download</em> and pick the date range you want (up to 13 months)</li>
+        <li>Save the resulting <code>.xml</code> or <code>.zip</code> file</li>
+        <li>Upload it below — re-uploads are safe (existing intervals are updated, not duplicated)</li>
+      </ol>
     </div>
-    <div id="comedDisconnected">
-      <p>Connect your ComEd account to grant this app access to your 15-minute interval usage data.</p>
-      <div class="comed-consent">
-        <strong>Before you connect, please note:</strong>
-        <ul>
-          <li>You will be redirected to ComEd's website to log in and approve data sharing</li>
-          <li>This app will access your 15-minute electricity usage data (up to 13 months)</li>
-          <li>Your ComEd username and password are never shared with this app</li>
-          <li>You can revoke access at any time via your ComEd account settings or by clicking Disconnect</li>
-          <li>Data is stored securely and encrypted at rest</li>
-        </ul>
-      </div>
-      <button class="submit-btn" onclick="handleComedConnect()">Connect ComEd Account</button>
+    <form id="usageUploadForm" onsubmit="handleUsageUpload(event)">
+      <input type="file" id="usageFileInput" accept=".xml,.zip" required />
+      <button type="submit" class="submit-btn" id="usageUploadBtn">Upload</button>
+    </form>
+    <div id="usageUploadMsg" class="form-msg"></div>
+    <div id="usageMetersWrapper" style="margin-top:16px;display:none">
+      <h3 style="margin-bottom:8px">Imported Meters</h3>
+      <div id="usageMetersTable"></div>
     </div>
   </div>
 </div>
@@ -225,6 +313,6 @@
   </span>
 </footer>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v={{STATIC_VERSION}}"></script>
 </body>
 </html>

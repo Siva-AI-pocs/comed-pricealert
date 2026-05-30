@@ -26,6 +26,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt   # pytest + pytest-asyncio
 
       # Importing the app surfaces missing/incompatible deps immediately,
       # before the test suite even starts collecting.

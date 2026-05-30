@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -8,8 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models import Price5Min
+from app.models import HourlyAverage, Price5Min
 from app.services.aggregator import recompute_hourly_averages
+
+# Cap a single on-upload backfill so one upload can't trigger hundreds of fetches.
+MAX_BACKFILL_DAYS = 92
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +31,13 @@ async def _fetch_with_retry(url: str, params: dict | None = None) -> list[dict]:
             if attempt == 2:
                 logger.error("ComEd API fetch failed after 3 attempts: %s", exc)
                 return []
-            wait = 2 ** attempt
-            logger.warning("ComEd API attempt %d failed (%s), retrying in %ds", attempt + 1, exc, wait)
+            wait = 2**attempt
+            logger.warning(
+                "ComEd API attempt %d failed (%s), retrying in %ds",
+                attempt + 1,
+                exc,
+                wait,
+            )
             await asyncio.sleep(wait)
     return []
 
@@ -69,14 +78,102 @@ async def _backfill_history(db: Session) -> None:
         day_end = day_start + timedelta(days=1)
         date_start = day_start.strftime("%Y%m%d%H%M")
         date_end = day_end.strftime("%Y%m%d%H%M")
-        data = await _fetch_with_retry(COMED_BASE, {
-            "type": "5minutefeed",
-            "datestart": date_start,
-            "dateend": date_end,
-        })
+        data = await _fetch_with_retry(
+            COMED_BASE,
+            {
+                "type": "5minutefeed",
+                "datestart": date_start,
+                "dateend": date_end,
+            },
+        )
         inserted = _upsert_rows(db, data)
         logger.info("Backfill %s: %d rows inserted", day_start.date(), inserted)
         await asyncio.sleep(1)
+
+
+async def backfill_hourly_prices(
+    db: Session,
+    start_utc: datetime | None,
+    end_utc: datetime | None,
+    max_days: int = MAX_BACKFILL_DAYS,
+) -> int:
+    """Fetch ComEd hourly prices covering [start_utc, end_utc] into hourly_averages.
+
+    Called after a usage upload so the usage-vs-price comparison works for data of
+    any age. Only hourly_averages is populated (that's what the insights join needs,
+    and the table we retain long-term). Idempotent: a day already covered is skipped
+    without a fetch, and existing hours are never overwritten. Returns rows inserted.
+    """
+    if start_utc is None or end_utc is None:
+        return 0
+    start_utc = start_utc.replace(tzinfo=None)
+    end_utc = end_utc.replace(tzinfo=None)
+    floor = end_utc - timedelta(days=max_days)
+    if start_utc < floor:
+        logger.info(
+            "Price backfill capped to last %d days (ending %s)",
+            max_days,
+            end_utc.date(),
+        )
+        start_utc = floor
+
+    day = start_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    last = end_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    inserted = 0
+    while day <= last:
+        nxt = day + timedelta(days=1)
+        covered = (
+            db.query(HourlyAverage)
+            .filter(HourlyAverage.hour_utc >= day, HourlyAverage.hour_utc < nxt)
+            .first()
+        )
+        if covered is None:
+            rows = await _fetch_with_retry(
+                COMED_BASE,
+                {
+                    "type": "5minutefeed",
+                    "datestart": day.strftime("%Y%m%d0000"),
+                    "dateend": nxt.strftime("%Y%m%d0000"),
+                },
+            )
+            buckets: dict[datetime, list[float]] = defaultdict(list)
+            for r in rows:
+                try:
+                    ts = datetime.fromtimestamp(
+                        int(r["millisUTC"]) / 1000, tz=timezone.utc
+                    ).replace(tzinfo=None)
+                except (KeyError, ValueError, TypeError):
+                    continue
+                try:
+                    price = float(r["price"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                buckets[ts.replace(minute=0, second=0, microsecond=0)].append(price)
+            for hour, prices in buckets.items():
+                if (
+                    db.query(HourlyAverage)
+                    .filter(HourlyAverage.hour_utc == hour)
+                    .first()
+                    is None
+                ):
+                    db.add(
+                        HourlyAverage(
+                            hour_utc=hour,
+                            avg_price_cents=sum(prices) / len(prices),
+                            sample_count=len(prices),
+                        )
+                    )
+                    inserted += 1
+            db.commit()
+        day = nxt
+    if inserted:
+        logger.info(
+            "Usage-upload price backfill: %d new hourly rows (%s..%s)",
+            inserted,
+            start_utc.date(),
+            end_utc.date(),
+        )
+    return inserted
 
 
 async def poll_and_store() -> None:
@@ -97,16 +194,32 @@ def purge_old_data() -> None:
     db: Session = SessionLocal()
     try:
         cutoff_ms = int(
-            (datetime.now(timezone.utc) - timedelta(days=settings.history_days)).timestamp() * 1000
+            (
+                datetime.now(timezone.utc) - timedelta(days=settings.history_days)
+            ).timestamp()
+            * 1000
         )
-        cutoff_dt = datetime.now(timezone.utc) - timedelta(days=settings.history_days)
-        cutoff_log = datetime.now(timezone.utc) - timedelta(days=settings.history_days * 2)
+        cutoff_log = datetime.now(timezone.utc) - timedelta(
+            days=settings.history_days * 2
+        )
 
-        r1 = db.execute(text("DELETE FROM price_5min WHERE millis_utc < :cutoff"), {"cutoff": cutoff_ms})
-        r2 = db.execute(text("DELETE FROM hourly_averages WHERE hour_utc < :cutoff"), {"cutoff": cutoff_dt})
-        r3 = db.execute(text("DELETE FROM alert_log WHERE sent_at < :cutoff"), {"cutoff": cutoff_log})
+        # NOTE: hourly_averages is intentionally NOT purged. It is tiny (~24 rows/day)
+        # and is the historic price record we join uploaded usage against for the
+        # usage-vs-price and savings insights — retaining it lets that comparison
+        # window grow over time. Only the high-volume price_5min feed is trimmed.
+        r1 = db.execute(
+            text("DELETE FROM price_5min WHERE millis_utc < :cutoff"),
+            {"cutoff": cutoff_ms},
+        )
+        r3 = db.execute(
+            text("DELETE FROM alert_log WHERE sent_at < :cutoff"),
+            {"cutoff": cutoff_log},
+        )
         db.commit()
-        logger.info("Purge: %d price rows, %d hourly rows, %d alert log rows deleted",
-                    r1.rowcount, r2.rowcount, r3.rowcount)
+        logger.info(
+            "Purge: %d price_5min rows, %d alert log rows deleted (hourly_averages retained)",
+            r1.rowcount,
+            r3.rowcount,
+        )
     finally:
         db.close()

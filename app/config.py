@@ -2,11 +2,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     database_url: str = "sqlite:///./data/comed.db"
     poll_interval_seconds: int = 300
     history_days: int = 7
+
+    # Usage-vs-price insights
+    flat_rate_cents: float = 8.5  # ComEd flat supply-rate baseline for bill comparison
+    default_shiftable_pct: float = 0.30  # share of peak-hour usage assumed shiftable
 
     # Telegram
     telegram_bot_token: str = ""
@@ -32,6 +38,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
+    # Password-reset code lifetime
+    reset_code_expire_minutes: int = 15
+
     # ComEd Green Button OAuth
     comed_client_id: str = ""
     comed_client_secret: str = ""
@@ -39,7 +48,7 @@ class Settings(BaseSettings):
     token_encryption_key: str = ""
 
     # App base URL (for building redirect URIs and links)
-    app_base_url: str = "https://comed-pricealert.onrender.com"
+    app_base_url: str = "http://localhost:8000"
 
     app_host: str = "0.0.0.0"
     app_port: int = 8000

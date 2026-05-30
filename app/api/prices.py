@@ -34,6 +34,7 @@ def get_current_price(db: Session = Depends(get_db)):
     row = db.query(Price5Min).order_by(Price5Min.millis_utc.desc()).first()
     if row is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=503, detail="No price data available yet")
     return row
 
@@ -42,40 +43,52 @@ def get_current_price(db: Session = Depends(get_db)):
 def get_5min_prices(
     days: int = Query(default=7, ge=1, le=7),
     today: bool = Query(default=False),
+    start: int | None = Query(default=None, description="Window start, epoch ms"),
+    end: int | None = Query(default=None, description="Window end, epoch ms"),
     db: Session = Depends(get_db),
 ):
-    if today:
-        cutoff_ms = _today_midnight_ms()
+    q = db.query(Price5Min)
+    if start is not None or end is not None:
+        # Explicit window (presets / custom range) takes precedence over days/today.
+        if start is not None:
+            q = q.filter(Price5Min.millis_utc >= start)
+        if end is not None:
+            q = q.filter(Price5Min.millis_utc <= end)
+    elif today:
+        q = q.filter(Price5Min.millis_utc >= _today_midnight_ms())
     else:
-        cutoff_ms = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp() * 1000)
+        cutoff_ms = int(
+            (datetime.now(timezone.utc) - timedelta(days=days)).timestamp() * 1000
+        )
+        q = q.filter(Price5Min.millis_utc >= cutoff_ms)
+    return q.order_by(Price5Min.millis_utc.asc()).all()
 
-    rows = (
-        db.query(Price5Min)
-        .filter(Price5Min.millis_utc >= cutoff_ms)
-        .order_by(Price5Min.millis_utc.asc())
-        .all()
-    )
-    return rows
+
+def _ms_to_naive_utc(ms: int) -> datetime:
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
 
 
 @router.get("/hourly", response_model=list[HourlyAverageOut])
 def get_hourly_prices(
-    days: int = Query(default=7, ge=1, le=7),
+    days: int = Query(default=7, ge=1, le=400),
     today: bool = Query(default=False),
+    start: int | None = Query(default=None, description="Window start, epoch ms"),
+    end: int | None = Query(default=None, description="Window end, epoch ms"),
     db: Session = Depends(get_db),
 ):
-    if today:
-        cutoff = _today_midnight_dt()
+    q = db.query(HourlyAverage)
+    if start is not None or end is not None:
+        if start is not None:
+            q = q.filter(HourlyAverage.hour_utc >= _ms_to_naive_utc(start))
+        if end is not None:
+            q = q.filter(HourlyAverage.hour_utc <= _ms_to_naive_utc(end))
+    elif today:
+        q = q.filter(HourlyAverage.hour_utc >= _today_midnight_dt())
     else:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-
-    rows = (
-        db.query(HourlyAverage)
-        .filter(HourlyAverage.hour_utc >= cutoff)
-        .order_by(HourlyAverage.hour_utc.asc())
-        .all()
-    )
-    return rows
+        q = q.filter(
+            HourlyAverage.hour_utc >= datetime.now(timezone.utc) - timedelta(days=days)
+        )
+    return q.order_by(HourlyAverage.hour_utc.asc()).all()
 
 
 @router.get("/stats", response_model=PriceStats)
@@ -89,13 +102,13 @@ def get_stats(db: Session = Depends(get_db)):
         text("SELECT price_cents FROM price_5min ORDER BY millis_utc DESC LIMIT 1")
     ).scalar()
 
-    latest_ms = db.execute(
-        text("SELECT MAX(millis_utc) FROM price_5min")
-    ).scalar()
+    latest_ms = db.execute(text("SELECT MAX(millis_utc) FROM price_5min")).scalar()
 
     if latest_ms:
         last_updated_utc = datetime.fromtimestamp(latest_ms / 1000, tz=timezone.utc)
-        data_age_seconds = int((datetime.now(timezone.utc) - last_updated_utc).total_seconds())
+        data_age_seconds = int(
+            (datetime.now(timezone.utc) - last_updated_utc).total_seconds()
+        )
         last_updated_str = last_updated_utc.strftime("%Y-%m-%dT%H:%M:%S")
     else:
         data_age_seconds = None
@@ -157,11 +170,13 @@ def get_daily_summary(db: Session = Depends(get_db)):
             {"day_start": day_start_utc, "day_end": day_end_utc},
         ).fetchone()
 
-        results.append(DailySummary(
-            date=day_start_ct.strftime("%Y-%m-%d"),
-            min_price=row[0] if row else None,
-            max_price=row[1] if row else None,
-            avg_price=round(row[2], 2) if row and row[2] is not None else None,
-        ))
+        results.append(
+            DailySummary(
+                date=day_start_ct.strftime("%Y-%m-%d"),
+                min_price=row[0] if row else None,
+                max_price=row[1] if row else None,
+                avg_price=round(row[2], 2) if row and row[2] is not None else None,
+            )
+        )
 
     return results

@@ -49,7 +49,9 @@ class SubscribeRequest(BaseModel):
         if v is not None:
             v = v.strip()
             if not v.startswith("+"):
-                raise ValueError("WhatsApp number must be in E.164 format, e.g. +13125551234")
+                raise ValueError(
+                    "WhatsApp number must be in E.164 format, e.g. +13125551234"
+                )
         return v or None
 
     @field_validator("email")
@@ -95,6 +97,92 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class UsageUploadResult(BaseModel):
+    meter_ids: list[int]
+    intervals_inserted: int
+    range_start_utc: datetime | None
+    range_end_utc: datetime | None
+    prices_backfilled: int = 0
+
+
+class UsageHourlyOut(BaseModel):
+    hour_utc: datetime
+    kwh: float
+    sample_count: int
+
+
+class UsageDailyOut(BaseModel):
+    date: str
+    kwh: float
+    sample_count: int
+
+
+class UsageMeterOut(BaseModel):
+    id: int
+    espi_usage_point_id: str
+    service_kind: str
+    label: str | None
+    created_at: datetime
+    interval_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class UsageInsightHour(BaseModel):
+    hour_utc: datetime
+    kwh: float
+    price_cents: float
+    cost_cents: float
+    level: str
+
+
+class UsageInsightsSummary(BaseModel):
+    days: int
+    total_kwh: float
+    actual_cost_cents: float
+    flat_cost_cents: float
+    flat_rate_cents: float
+    hourly_vs_flat_cents: float
+    shiftable_pct: float
+    shiftable_kwh: float
+    optimized_cost_cents: float
+    shift_savings_cents: float
+
+
+class UsageInsightsOut(BaseModel):
+    hourly: list[UsageInsightHour]
+    summary: UsageInsightsSummary
 
 
 class UserOut(BaseModel):
