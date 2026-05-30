@@ -1,0 +1,4 @@
+# Dev-only tools (not needed at runtime / on Render).
+# Install into your venv so the Claude Code format-on-edit hook is live:
+#   pip install -r requirements-dev.txt
+ruff==0.15.15

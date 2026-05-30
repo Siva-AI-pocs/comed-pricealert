@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Formatting with ruff…",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath // empty' | { read -r f; [ -n \"$f\" ] || exit 0; [ \"${f##*.}\" = \"py\" ] || exit 0; if command -v ruff >/dev/null 2>&1; then ruff format -q \"$f\"; elif [ -x venv/Scripts/ruff.exe ]; then venv/Scripts/ruff.exe format -q \"$f\"; elif [ -x venv/bin/ruff ]; then venv/bin/ruff format -q \"$f\"; fi; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

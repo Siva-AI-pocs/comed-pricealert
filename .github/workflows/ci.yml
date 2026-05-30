@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests (fresh install + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # Fresh install from the pinned requirements — this is what catches the
+      # dependency-break class of bugs (e.g. bcrypt 5.x vs passlib, a missing
+      # email-validator) that only surface in a clean environment, not in a
+      # dev venv that already has working deps.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Importing the app surfaces missing/incompatible deps immediately,
+      # before the test suite even starts collecting.
+      - name: Import smoke test
+        run: python -c "from app.main import app; print('app imported OK')"
+
+      - name: Run tests
+        run: pytest
+
+  lint:
+    name: Ruff (format + lint)
+    runs-on: ubuntu-latest
+    # Advisory for now: the repo predates ruff (27 files unformatted, some lint
+    # findings). The format-on-edit hook cleans files as they're touched. Once
+    # `ruff format .` + `ruff check --fix .` have been run repo-wide, remove this
+    # line to make lint a hard gate.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install ruff
+        run: pip install -r requirements-dev.txt
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Lint
+        run: ruff check .

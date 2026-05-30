@@ -1,0 +1,7 @@
+# Ruff config — used by the format-on-edit Claude Code hook (.claude/settings.json)
+# and any manual `ruff format` / `ruff check` runs.
+target-version = "py311"
+line-length = 88
+
+[format]
+quote-style = "double"
