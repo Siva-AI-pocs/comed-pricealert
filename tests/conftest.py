@@ -17,6 +17,18 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 # (A developer .env with APP_BASE_URL=https://… would otherwise break auth tests.)
 os.environ["APP_BASE_URL"] = "http://localhost"
 
+# Neutralize all notification credentials so the suite NEVER sends real
+# emails/Telegram/WhatsApp via a developer .env, and channel-failure tests are
+# deterministic (every channel reports "not configured" unless explicitly mocked).
+for _var in (
+    "SMTP_USER",
+    "SMTP_PASSWORD",
+    "TELEGRAM_BOT_TOKEN",
+    "META_WHATSAPP_TOKEN",
+    "META_WHATSAPP_PHONE_ID",
+):
+    os.environ[_var] = ""
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
