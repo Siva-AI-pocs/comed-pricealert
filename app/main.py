@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
@@ -34,6 +34,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ComEd Price Alert", lifespan=lifespan)
+
+# Sliding-session refresh: re-issue the auth cookie for active users.
+from app.auth.session import add_sliding_session_refresh  # noqa: E402
+
+add_sliding_session_refresh(app)
 
 # API routers
 from app.api import auth, decision, internal, prices, subscriptions, usage  # noqa: E402

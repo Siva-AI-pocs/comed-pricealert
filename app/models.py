@@ -184,3 +184,29 @@ class AlertLog(Base):
     subscription: Mapped["Subscription"] = relationship(
         "Subscription", back_populates="alerts"
     )
+
+
+class LoginAudit(Base):
+    """Audit trail of authentication events (login, logout, register, etc.).
+
+    A new table, so it is created by ``Base.metadata.create_all`` in
+    ``init_db`` — no manual column migration needed.
+    """
+
+    __tablename__ = "login_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # Nullable: a failed login for an unknown email has no user.
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, index=True
+    )
+    email: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    # One of: login_success, login_failure, logout, register,
+    # password_reset, password_change.
+    event_type: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
