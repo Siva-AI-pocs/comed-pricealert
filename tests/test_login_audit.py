@@ -112,3 +112,26 @@ class TestAuthEventRecording:
         _register(client, email="ts@test.com")
         rows = _audits(db, "register")
         assert rows[0].created_at is not None
+
+    def test_audit_prefers_cf_connecting_ip(self, client, db):
+        # Behind Cloudflare the leftmost X-Forwarded-For hop is attacker-
+        # controlled; CF-Connecting-IP is the authoritative client IP.
+        _register(
+            client,
+            email="cf@test.com",
+            headers={
+                "CF-Connecting-IP": "198.51.100.42",
+                "X-Forwarded-For": "1.1.1.1, 70.0.0.1",
+            },
+        )
+        rows = _audits(db, "register")
+        assert rows[0].ip_address == "198.51.100.42"
+
+    def test_audit_failure_does_not_break_request(self, client, db, monkeypatch):
+        # A broken audit insert must never turn a successful auth call into a 500.
+        def _boom(*a, **k):
+            raise RuntimeError("audit table unavailable")
+
+        monkeypatch.setattr("app.services.audit.LoginAudit", _boom)
+        r = _register(client, email="resilient@test.com")
+        assert r.status_code == 200, r.text

@@ -32,6 +32,10 @@ from app.services import audit, notifier
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Precomputed hash used to equalize login timing for unknown emails, so a
+# missing account can't be distinguished from a wrong password by response time.
+_DUMMY_PASSWORD_HASH = get_password_hash("timing-equalizer-not-a-real-password")
+
 COMED_AUTH_URL = (
     "https://secure.comed.com/MyAccount/MyBillUsage/pages/GBCThirdPartyReg.aspx"
 )
@@ -77,7 +81,12 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
 @router.post("/login", response_model=UserOut)
 def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
-    if not user or not verify_password(req.password, user.hashed_password):
+    # Always run a bcrypt verify (against a dummy hash when the user is unknown)
+    # so login time doesn't reveal whether an email is registered.
+    password_ok = verify_password(
+        req.password, user.hashed_password if user else _DUMMY_PASSWORD_HASH
+    )
+    if not user or not password_ok:
         audit.record_auth_event(
             db,
             request,
