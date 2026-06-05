@@ -103,6 +103,10 @@ class Subscription(Base):
     high_threshold_cents: Mapped[float | None] = mapped_column(
         Float, nullable=True, default=None
     )
+    # Opt-in (default on) for the "grid is paying you" negative-price alert.
+    notify_negative: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

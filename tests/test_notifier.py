@@ -140,6 +140,15 @@ class TestBuildMessage:
         )
         assert "2.75" in msg
 
+    def test_negative_alert_headline(self):
+        msg = _build_message(
+            price=-0.5,
+            threshold=0.0,
+            dashboard_url="https://x.com",
+            direction="negative",
+        )
+        assert "the grid is paying you" in msg.lower()
+
 
 # ---------------------------------------------------------------------------
 # check_and_notify — threshold and cooldown logic
@@ -431,3 +440,36 @@ class TestCheckAndNotify:
         mock_tg.assert_called_once()
         mock_wa.assert_called_once()
         mock_em.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_negative_price_fires_grid_pays_you_alert(self, db):
+        """A 5-min spot price <= 0 fires the negative alert even when the hour
+        average is positive and the low threshold wouldn't otherwise trigger."""
+        _make_sub(db, telegram_chat_id="neg1", threshold_cents=-5.0)
+        _seed_price(db, price=2.0)  # current-hour avg ~2¢ (low won't fire)
+
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
+            await check_and_notify(db, current_price=-0.5)  # spot goes negative
+
+        mock_tg.assert_called_once()
+        assert "the grid is paying you" in mock_tg.call_args[0][1].lower()
+
+    @pytest.mark.asyncio
+    async def test_negative_alert_suppressed_when_opted_out(self, db):
+        _make_sub(
+            db, telegram_chat_id="neg2", threshold_cents=-5.0, notify_negative=False
+        )
+        _seed_price(db, price=2.0)
+
+        with patch(
+            "app.services.notifier._send_telegram",
+            new_callable=AsyncMock,
+            return_value=(True, ""),
+        ) as mock_tg:
+            await check_and_notify(db, current_price=-0.5)
+
+        mock_tg.assert_not_called()

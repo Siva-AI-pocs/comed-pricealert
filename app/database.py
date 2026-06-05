@@ -49,6 +49,7 @@ def init_db() -> None:
     for ddl in (
         "ALTER TABLE users ADD COLUMN reset_code_hash TEXT",
         "ALTER TABLE users ADD COLUMN reset_code_expires_at TIMESTAMP",
+        "ALTER TABLE subscriptions ADD COLUMN notify_negative BOOLEAN DEFAULT TRUE",
     ):
         try:
             with engine.connect() as conn:

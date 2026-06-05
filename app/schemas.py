@@ -42,6 +42,7 @@ class SubscribeRequest(BaseModel):
     whatsapp_number: str | None = None
     threshold_cents: float = 0.0
     high_threshold_cents: float | None = None
+    notify_negative: bool = True
 
     @field_validator("whatsapp_number")
     @classmethod
@@ -75,6 +76,7 @@ class SubscriptionOut(BaseModel):
     whatsapp_number: str | None
     threshold_cents: float
     high_threshold_cents: float | None
+    notify_negative: bool = True
     active: bool
     created_at: datetime
     last_alerted_at: datetime | None

@@ -41,6 +41,22 @@ describe("SubscribeForm", () => {
     await vi.waitFor(() => expect(onSubscribed).toHaveBeenCalled());
     expect(body.email).toBe("a@b.com");
     expect(body.threshold_cents).toBe(3);
+    expect(body.notify_negative).toBe(true); // on by default
+  });
+
+  it("can opt out of the negative-price alert", async () => {
+    let body;
+    global.fetch = vi.fn((url, opts) => {
+      body = JSON.parse(opts.body);
+      return Promise.resolve(mkRes({ id: 1, email: "a@b.com" }));
+    });
+    const user = userEvent.setup();
+    render(<SubscribeForm onSubscribed={() => {}} />);
+    await user.type(screen.getByLabelText(/email/i), "a@b.com");
+    await user.click(screen.getByRole("checkbox", { name: /negative-price/i }));
+    await user.click(screen.getByRole("button", { name: /subscribe/i }));
+    await vi.waitFor(() => expect(body).toBeTruthy());
+    expect(body.notify_negative).toBe(false);
   });
 
   it("surfaces a backend validation error", async () => {

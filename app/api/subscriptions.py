@@ -44,6 +44,7 @@ async def subscribe(req: SubscribeRequest, db: Session = Depends(get_db), curren
         existing.whatsapp_number = req.whatsapp_number or existing.whatsapp_number
         existing.threshold_cents = req.threshold_cents
         existing.high_threshold_cents = req.high_threshold_cents
+        existing.notify_negative = req.notify_negative
         existing.active = True
         if current_user and existing.user_id is None:
             existing.user_id = current_user.id
@@ -58,6 +59,7 @@ async def subscribe(req: SubscribeRequest, db: Session = Depends(get_db), curren
         whatsapp_number=req.whatsapp_number,
         threshold_cents=req.threshold_cents,
         high_threshold_cents=req.high_threshold_cents,
+        notify_negative=req.notify_negative,
     )
     db.add(sub)
     db.commit()

@@ -8,6 +8,7 @@ export default function SubscribeForm({ onSubscribed }) {
   const [whatsapp, setWhatsapp] = useState("");
   const [low, setLow] = useState("3");
   const [high, setHigh] = useState("");
+  const [notifyNegative, setNotifyNegative] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,6 +30,7 @@ export default function SubscribeForm({ onSubscribed }) {
       whatsapp_number: whatsapp.trim() || null,
       threshold_cents: low === "" ? 0 : Number(low),
       high_threshold_cents: high === "" ? null : Number(high),
+      notify_negative: notifyNegative,
     };
 
     setBusy(true);
@@ -95,6 +97,23 @@ export default function SubscribeForm({ onSubscribed }) {
         value={high}
         onChange={(e) => setHigh(e.target.value)}
       />
+
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginTop: 12,
+          flexDirection: "row",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={notifyNegative}
+          onChange={(e) => setNotifyNegative(e.target.checked)}
+        />
+        ⚡ Negative-price alert (the grid pays you)
+      </label>
 
       <button className="auth-submit" type="submit" disabled={busy}>
         {busy ? "Subscribing…" : "Subscribe"}
