@@ -12,8 +12,9 @@ beforeEach(() => {
 });
 
 describe("ThemePicker", () => {
-  it("offers all three brands and a mode toggle", () => {
+  it("offers all three brands and a mode toggle", async () => {
     renderWithProviders(<ThemePicker />);
+    await screen.findByRole("group", { name: /theme/i }); // flush auth bootstrap
     // Exact names: /volt/i would also match "Voltaic".
     expect(screen.getByRole("button", { name: "Voltaic" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Grid" })).toBeInTheDocument();
@@ -24,8 +25,9 @@ describe("ThemePicker", () => {
     ).toBeInTheDocument();
   });
 
-  it("marks the active brand as pressed (Voltaic by default)", () => {
+  it("marks the active brand as pressed (Voltaic by default)", async () => {
     renderWithProviders(<ThemePicker />);
+    await screen.findByRole("group", { name: /theme/i }); // flush auth bootstrap
     expect(screen.getByRole("button", { name: /voltaic/i })).toHaveAttribute(
       "aria-pressed",
       "true",

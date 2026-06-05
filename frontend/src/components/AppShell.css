@@ -111,6 +111,9 @@
   .topbar-theme {
     display: none;
   }
+  .topbar-account {
+    margin-left: auto;
+  }
   .bottomnav {
     display: flex;
   }
