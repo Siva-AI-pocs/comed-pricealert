@@ -185,6 +185,30 @@ class UsageInsightsOut(BaseModel):
     summary: UsageInsightsSummary
 
 
+class ForecastPoint(BaseModel):
+    target_ts: datetime
+    p10: float
+    p50: float
+    p90: float
+    spike_prob: float | None = None
+    da_lmp: float | None = None
+    model_version: str
+
+    model_config = {"from_attributes": True}
+
+
+class ForecastAccuracyDay(BaseModel):
+    day: str
+    model: float | None
+    da: float | None
+
+
+class ForecastAccuracy(BaseModel):
+    mae: float | None
+    vs_day_ahead_pct: float | None
+    daily: list[ForecastAccuracyDay]
+
+
 class UserOut(BaseModel):
     id: int
     email: str

@@ -186,6 +186,41 @@ class AlertLog(Base):
     )
 
 
+class PriceForecast(Base):
+    """48h probabilistic forecast rows (written by the offline/baseline job).
+
+    New table — created by ``Base.metadata.create_all``. The API only reads the
+    most recent ``generated_at`` batch; ``UNIQUE(target_ts, generated_at)`` keeps
+    a re-run for the same instant idempotent.
+    """
+
+    __tablename__ = "price_forecast"
+    __table_args__ = (
+        UniqueConstraint("target_ts", "generated_at", name="uq_forecast_target_gen"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    target_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    p10: Mapped[float] = mapped_column(Float, nullable=False)
+    p50: Mapped[float] = mapped_column(Float, nullable=False)
+    p90: Mapped[float] = mapped_column(Float, nullable=False)
+    spike_prob: Mapped[float | None] = mapped_column(Float, nullable=True)
+    da_lmp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_version: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
+
+
+class PriceActual(Base):
+    """Settled real-time price per hour, for scoring forecast accuracy."""
+
+    __tablename__ = "price_actual"
+
+    target_ts: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    rt_price: Mapped[float] = mapped_column(Float, nullable=False)
+
+
 class LoginAudit(Base):
     """Audit trail of authentication events (login, logout, register, etc.).
 

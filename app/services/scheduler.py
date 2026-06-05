@@ -35,6 +35,13 @@ def create_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        _run_forecast,
+        trigger=CronTrigger(minute=5),  # a few minutes after the hourly poll/notify
+        id="forecast_refresh",
+        replace_existing=True,
+    )
+
     return scheduler
 
 
@@ -69,3 +76,15 @@ def _run_purge() -> None:
         purge_old_data()
     except Exception:
         logger.exception("Unhandled error in purge_old_data")
+
+
+def _run_forecast() -> None:
+    from app.database import SessionLocal
+    from app.services import forecast_baseline
+    db = SessionLocal()
+    try:
+        forecast_baseline.run(db)
+    except Exception:
+        logger.exception("Unhandled error in forecast_refresh")
+    finally:
+        db.close()

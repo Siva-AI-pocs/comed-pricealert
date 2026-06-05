@@ -41,7 +41,15 @@ from app.auth.session import add_sliding_session_refresh  # noqa: E402
 add_sliding_session_refresh(app)
 
 # API routers
-from app.api import auth, decision, internal, prices, subscriptions, usage  # noqa: E402
+from app.api import (  # noqa: E402
+    auth,
+    decision,
+    forecast,
+    internal,
+    prices,
+    subscriptions,
+    usage,
+)
 
 app.include_router(auth.router)
 app.include_router(prices.router)
@@ -49,6 +57,7 @@ app.include_router(subscriptions.router)
 app.include_router(decision.router)
 app.include_router(internal.router)
 app.include_router(usage.router)
+app.include_router(forecast.router)
 
 
 @app.get("/health")
