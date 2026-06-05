@@ -1,14 +1,5 @@
 import { api } from "./client.js";
-
-function qs(params = {}) {
-  const entries = Object.entries(params).filter(
-    ([, v]) => v !== undefined && v !== null && v !== false,
-  );
-  if (!entries.length) return "";
-  const sp = new URLSearchParams();
-  for (const [k, v] of entries) sp.set(k, String(v));
-  return `?${sp.toString()}`;
-}
+import { qs } from "./qs.js";
 
 export const pricesApi = {
   stats: () => api.get("/api/prices/stats"),

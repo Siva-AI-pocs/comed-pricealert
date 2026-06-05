@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { tierColor, fiveMinChartData, hourlyChartData } from "./chartData.js";
+import {
+  tierColor,
+  fiveMinChartData,
+  hourlyChartData,
+  usageVsPriceData,
+} from "./chartData.js";
 
 // Fake CSS-var resolver mapping each tier token to a sentinel color.
 const readVar = (name) =>
@@ -45,5 +50,18 @@ describe("hourlyChartData", () => {
     const out = hourlyChartData(rows, readVar);
     expect(out.data).toEqual([2, 16]);
     expect(out.colors).toEqual(["#cheap", "#spike"]);
+  });
+});
+
+describe("usageVsPriceData", () => {
+  it("splits insight rows into usage + price series with price tier colors", () => {
+    const hourly = [
+      { hour_utc: "2026-06-04T00:00:00", kwh: 0.4, price_cents: 2 },
+      { hour_utc: "2026-06-04T01:00:00", kwh: 1.2, price_cents: 12 },
+    ];
+    const out = usageVsPriceData(hourly, readVar);
+    expect(out.usage).toEqual([0.4, 1.2]);
+    expect(out.price).toEqual([2, 12]);
+    expect(out.priceColors).toEqual(["#cheap", "#high"]);
   });
 });

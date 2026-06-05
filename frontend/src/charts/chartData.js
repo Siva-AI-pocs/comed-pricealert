@@ -25,3 +25,13 @@ export function hourlyChartData(rows, readVar) {
     colors: rows.map((r) => tierColor(r.avg_price_cents, readVar)),
   };
 }
+
+/** Usage-vs-price dual-axis series from insights.hourly rows. */
+export function usageVsPriceData(hourly, readVar) {
+  return {
+    labels: hourly.map((h) => h.hour_utc),
+    usage: hourly.map((h) => h.kwh),
+    price: hourly.map((h) => h.price_cents),
+    priceColors: hourly.map((h) => tierColor(h.price_cents, readVar)),
+  };
+}

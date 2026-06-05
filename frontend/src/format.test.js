@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cents, deltaPct } from "./format.js";
+import { cents, deltaPct, dollars } from "./format.js";
 
 describe("cents", () => {
   it("formats a number to one decimal with a ¢ suffix", () => {
@@ -11,6 +11,17 @@ describe("cents", () => {
     expect(cents(null)).toBe("—");
     expect(cents(undefined)).toBe("—");
     expect(cents(NaN)).toBe("—");
+  });
+});
+
+describe("dollars", () => {
+  it("formats cents as dollars", () => {
+    expect(dollars(123)).toBe("$1.23");
+    expect(dollars(0)).toBe("$0.00");
+    expect(dollars(-450)).toBe("-$4.50");
+  });
+  it("renders an em dash for missing values", () => {
+    expect(dollars(null)).toBe("—");
   });
 });
 
