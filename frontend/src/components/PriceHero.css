@@ -1,0 +1,35 @@
+.price-hero {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px 24px;
+  margin: 12px 0;
+}
+.ph-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.ph-price {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 66px;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  margin: 14px 0 2px;
+}
+.ph-cent {
+  font-size: 26px;
+  color: var(--dim);
+  margin-left: 4px;
+}
+.ph-sub {
+  color: var(--dim);
+  font-size: 14px;
+  margin: 0;
+}

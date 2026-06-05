@@ -1,0 +1,30 @@
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin: 12px 0;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.stat-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 700;
+}
+.stat-value {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  margin-top: 4px;
+}
+@media (max-width: 720px) {
+  .stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

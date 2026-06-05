@@ -1,0 +1,24 @@
+.daily-summary {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 16px;
+  overflow-x: auto;
+}
+.daily-summary table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.daily-summary th {
+  text-align: left;
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 8px;
+}
+.daily-summary td {
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+}
