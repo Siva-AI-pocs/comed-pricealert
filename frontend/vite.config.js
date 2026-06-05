@@ -6,7 +6,10 @@ import react from "@vitejs/plugin-react";
 // In prod, build hashed assets into app/static_spa/ (served at /static_spa/).
 export default defineConfig({
   plugins: [react()],
-  base: "/static_spa/",
+  // Served by FastAPI under /app during staging. At cutover, rebuild with
+  // VITE_BASE=/ to serve at the site root. react-router basename derives from
+  // this via import.meta.env.BASE_URL, so no code change is needed at cutover.
+  base: process.env.VITE_BASE || "/app/",
   build: {
     outDir: "../app/static_spa",
     emptyOutDir: true,
