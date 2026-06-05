@@ -7,6 +7,7 @@ import AlertsTab from "../tabs/AlertsTab.jsx";
 import MoreTab from "../tabs/MoreTab.jsx";
 import PrivacyPage from "../tabs/PrivacyPage.jsx";
 import TermsPage from "../tabs/TermsPage.jsx";
+import ThemePicker from "./ThemePicker.jsx";
 import "./AppShell.css";
 
 export default function AppShell() {
@@ -26,6 +27,9 @@ export default function AppShell() {
             </NavLink>
           ))}
         </nav>
+        <div className="topbar-theme">
+          <ThemePicker />
+        </div>
       </header>
 
       <main className="content">

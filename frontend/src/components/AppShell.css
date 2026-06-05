@@ -107,6 +107,10 @@
   .topnav {
     display: none;
   }
+  /* On phones the theme picker lives in the More tab, not the cramped top bar. */
+  .topbar-theme {
+    display: none;
+  }
   .bottomnav {
     display: flex;
   }

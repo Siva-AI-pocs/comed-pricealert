@@ -1,0 +1,48 @@
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  color: var(--txt);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.tp-brand:hover {
+  border-color: var(--accent);
+}
+.tp-brand.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tp-sw {
+  display: inline-flex;
+  gap: 3px;
+}
+.tp-sw i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: block;
+}
+.tp-mode {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--txt);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+}
