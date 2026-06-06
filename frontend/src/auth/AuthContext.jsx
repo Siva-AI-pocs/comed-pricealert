@@ -62,9 +62,27 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const updateProfile = useCallback(async (fields) => {
+    const updated = await authApi.updateProfile(fields);
+    setUser(updated);
+    return updated;
+  }, []);
+
+  const changeEmail = useCallback(async (new_email, password) => {
+    const updated = await authApi.changeEmail(new_email, password);
+    setUser(updated);
+    return updated;
+  }, []);
+
+  const changePassword = useCallback(
+    (old_password, new_password) =>
+      authApi.changePassword(old_password, new_password),
+    [],
+  );
+
   return (
     <AuthContext.Provider
-      value={{ user, status, login, register, logout, refresh }}
+      value={{ user, status, login, register, logout, refresh, updateProfile, changeEmail, changePassword }}
     >
       {children}
     </AuthContext.Provider>

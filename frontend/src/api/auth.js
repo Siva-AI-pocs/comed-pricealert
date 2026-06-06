@@ -11,4 +11,7 @@ export const authApi = {
     api.post("/auth/reset-password", { email, code, new_password }),
   changePassword: (old_password, new_password) =>
     api.post("/auth/change-password", { old_password, new_password }),
+  updateProfile: (fields) => api.patch("/auth/me", fields),
+  changeEmail: (new_email, password) =>
+    api.post("/auth/change-email", { new_email, password }),
 };
