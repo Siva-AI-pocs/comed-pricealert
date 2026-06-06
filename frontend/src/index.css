@@ -18,6 +18,9 @@ body {
   font-family: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  /* Never allow horizontal scroll — guards against a stray wide element
+     (e.g. a long header item or chart) on narrow mobile widths. */
+  overflow-x: hidden;
   transition: background 0.3s, color 0.3s;
 }
 

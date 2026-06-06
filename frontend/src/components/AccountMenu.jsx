@@ -36,13 +36,17 @@ export default function AccountMenu() {
           className="account-trigger"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
+          aria-label="Account menu"
+          title={user.email}
           onClick={() => setMenuOpen((o) => !o)}
         >
-          <span className="account-email" title={user.email}>{user.email}</span>
-          <span aria-hidden="true">▾</span>
+          <span aria-hidden="true">👤</span>
         </button>
         {menuOpen && (
           <div className="account-pop" role="menu">
+            <div className="account-pop-user" title={user.email}>
+              {user.email}
+            </div>
             <Link
               className="account-pop-item"
               role="menuitem"
