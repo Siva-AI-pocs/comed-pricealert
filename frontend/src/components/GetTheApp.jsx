@@ -13,9 +13,9 @@ function AndroidLink() {
 function IosLink() {
   if (!APP_STORE_URL) {
     return (
-      <span className="get-app-btn disabled" aria-disabled="true">
+      <button type="button" className="get-app-btn disabled" disabled>
         <span aria-hidden="true">🍎</span> iOS — coming soon
-      </span>
+      </button>
     );
   }
   return (
