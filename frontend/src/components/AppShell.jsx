@@ -10,6 +10,7 @@ import PrivacyPage from "../tabs/PrivacyPage.jsx";
 import TermsPage from "../tabs/TermsPage.jsx";
 import ThemePicker from "./ThemePicker.jsx";
 import AccountMenu from "./AccountMenu.jsx";
+import GetTheApp from "./GetTheApp.jsx";
 import ProtectedRoute from "../auth/ProtectedRoute.jsx";
 import "./AppShell.css";
 
@@ -157,6 +158,7 @@ export default function AppShell() {
           <span aria-hidden="true">·</span>
           <Link to="/terms">Terms</Link>
           <span className="pp-footer-copy">ComEd Price Pulse</span>
+          <GetTheApp />
         </footer>
       </main>
     </div>
