@@ -62,6 +62,16 @@ try {
   Write-Host "==> Syncing Capacitor..."
   npx --no-install cap sync android
   if ($LASTEXITCODE -ne 0) { throw "cap sync android failed." }
+
+  # Modern AGP (8.9+) requires compileSdk 35; the Capacitor template ships 34,
+  # which fails at config time ("provider has no value"). Bump it.
+  $vars = Join-Path $frontend "android\variables.gradle"
+  if (Test-Path $vars) {
+    $v = (Get-Content $vars -Raw) `
+      -replace 'compileSdkVersion = 34', 'compileSdkVersion = 35' `
+      -replace 'targetSdkVersion = 34', 'targetSdkVersion = 35'
+    Set-Content -Path $vars -Value $v -Encoding ascii
+  }
 }
 finally {
   Pop-Location

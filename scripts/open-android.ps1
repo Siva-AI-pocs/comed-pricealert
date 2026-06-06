@@ -115,6 +115,18 @@ try {
   Write-Host "==> Syncing Capacitor (bakes the chosen server URL into android/)..."
   npx --no-install cap sync android
   if ($LASTEXITCODE -ne 0) { throw "cap sync android failed." }
+
+  # Android Studio auto-upgrades the Android Gradle Plugin to 8.9+, which
+  # requires compileSdk 35; the Capacitor template ships 34, which then fails
+  # at config time ("provider has no value"). Bump it so builds succeed.
+  $vars = Join-Path $frontend "android\variables.gradle"
+  if (Test-Path $vars) {
+    $v = (Get-Content $vars -Raw) `
+      -replace 'compileSdkVersion = 34', 'compileSdkVersion = 35' `
+      -replace 'targetSdkVersion = 34', 'targetSdkVersion = 35'
+    [System.IO.File]::WriteAllText($vars, $v, $utf8NoBom)
+    Write-Host "    Set compileSdk/targetSdk = 35 (AGP 8.9+ requirement)."
+  }
 }
 finally {
   Pop-Location
