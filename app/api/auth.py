@@ -54,6 +54,22 @@ def _claim_orphan_subscriptions(db: Session, user: User) -> None:
     db.commit()
 
 
+def _user_out(db: Session, user: User) -> UserOut:
+    """Build the UserOut response, including computed comed_connected + profile fields."""
+    comed_connected = (
+        db.query(ComedAccount).filter(ComedAccount.user_id == user.id).first()
+        is not None
+    )
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        created_at=user.created_at,
+        comed_connected=comed_connected,
+        name=user.name,
+        timezone=user.timezone,
+    )
+
+
 @router.post("/register", response_model=UserOut)
 def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == req.email).first():
@@ -70,9 +86,7 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
         db, request, audit.REGISTER, user_id=user.id, email=user.email
     )
     token = create_access_token({"sub": str(user.id)})
-    out = UserOut(
-        id=user.id, email=user.email, created_at=user.created_at, comed_connected=False
-    )
+    out = _user_out(db, user)
     resp = JSONResponse(content=out.model_dump(mode="json"))
     _set_auth_cookie(resp, token)
     return resp
@@ -101,16 +115,7 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
         db, request, audit.LOGIN_SUCCESS, user_id=user.id, email=user.email
     )
     token = create_access_token({"sub": str(user.id)})
-    comed_connected = (
-        db.query(ComedAccount).filter(ComedAccount.user_id == user.id).first()
-        is not None
-    )
-    out = UserOut(
-        id=user.id,
-        email=user.email,
-        created_at=user.created_at,
-        comed_connected=comed_connected,
-    )
+    out = _user_out(db, user)
     resp = JSONResponse(content=out.model_dump(mode="json"))
     _set_auth_cookie(resp, token)
     return resp
@@ -202,16 +207,7 @@ def reset_password(
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    comed_connected = (
-        db.query(ComedAccount).filter(ComedAccount.user_id == current_user.id).first()
-        is not None
-    )
-    return UserOut(
-        id=current_user.id,
-        email=current_user.email,
-        created_at=current_user.created_at,
-        comed_connected=comed_connected,
-    )
+    return _user_out(db, current_user)
 
 
 @router.get("/comed/connect")

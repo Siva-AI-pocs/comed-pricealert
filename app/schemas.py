@@ -216,5 +216,7 @@ class UserOut(BaseModel):
     email: str
     created_at: datetime
     comed_connected: bool = False
+    name: str | None = None
+    timezone: str | None = None
 
     model_config = {"from_attributes": True}

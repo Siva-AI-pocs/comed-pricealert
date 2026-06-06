@@ -55,6 +55,8 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timezone: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Password-reset code (bcrypt-hashed) and its expiry, set during forgot-password.
     reset_code_hash: Mapped[str | None] = mapped_column(Text, nullable=True)

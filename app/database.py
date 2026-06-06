@@ -50,6 +50,8 @@ def init_db() -> None:
         "ALTER TABLE users ADD COLUMN reset_code_hash TEXT",
         "ALTER TABLE users ADD COLUMN reset_code_expires_at TIMESTAMP",
         "ALTER TABLE subscriptions ADD COLUMN notify_negative BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE users ADD COLUMN name TEXT",
+        "ALTER TABLE users ADD COLUMN timezone TEXT",
     ):
         try:
             with engine.connect() as conn:
