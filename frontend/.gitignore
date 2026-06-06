@@ -5,3 +5,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+
+# Capacitor native projects — generated on demand by scripts/build-android.ps1
+android/
+ios/
