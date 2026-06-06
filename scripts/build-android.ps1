@@ -38,12 +38,27 @@ function Need($cmd, $hint) {
 Write-Host "==> Checking prerequisites..."
 Need "node" "Install Node.js (https://nodejs.org)."
 Need "npm"  "Install Node.js (npm ships with it)."
-Need "java" "Install JDK 17+ and put 'java' on PATH."
+
+# Use Android Studio's bundled JDK (JBR) for the build — the system 'java' may
+# be too new for Gradle (e.g. JDK 25). Fall back to whatever JAVA_HOME/PATH has.
+$jbr = "C:\Program Files\Android\Android Studio\jbr"
+if (Test-Path (Join-Path $jbr "bin\java.exe")) {
+  $env:JAVA_HOME = $jbr
+}
+elseif (-not $env:JAVA_HOME) {
+  Need "java" "Install JDK 17 or 21 (or Android Studio) and set JAVA_HOME."
+}
+
 $sdk = $env:ANDROID_HOME
 if (-not $sdk) { $sdk = $env:ANDROID_SDK_ROOT }
-if (-not $sdk -or -not (Test-Path $sdk)) {
-  throw "Android SDK not found. Install Android Studio, then set ANDROID_HOME (or ANDROID_SDK_ROOT) to the SDK path."
+if (-not $sdk) { $sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk" }
+if (-not (Test-Path $sdk)) {
+  throw "Android SDK not found at $sdk. Install Android Studio, then set ANDROID_HOME (or ANDROID_SDK_ROOT) to the SDK path."
 }
+$env:ANDROID_HOME = $sdk
+$env:ANDROID_SDK_ROOT = $sdk
+Write-Host "    JAVA_HOME    = $env:JAVA_HOME"
+Write-Host "    ANDROID_HOME = $sdk"
 
 Write-Host "==> Building the web app (Capacitor webDir source)..."
 npm --prefix $frontend run build
