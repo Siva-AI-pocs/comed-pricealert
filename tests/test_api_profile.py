@@ -46,3 +46,39 @@ class TestUpdateProfile:
         # No registration → no cookie.
         r = client.patch("/auth/me", json={"name": "x"})
         assert r.status_code == 401
+
+
+class TestChangeEmail:
+    def test_change_email_success(self, client):
+        _register(client, email="old@test.com", password="origpass1")
+        r = client.post(
+            "/auth/change-email",
+            json={"new_email": "new@test.com", "password": "origpass1"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["email"] == "new@test.com"
+        # Can log in with the new email.
+        assert (
+            client.post(
+                "/auth/login", json={"email": "new@test.com", "password": "origpass1"}
+            ).status_code
+            == 200
+        )
+
+    def test_change_email_wrong_password(self, client):
+        _register(client, email="old@test.com", password="origpass1")
+        r = client.post(
+            "/auth/change-email",
+            json={"new_email": "new@test.com", "password": "wrongpass"},
+        )
+        assert r.status_code == 401
+
+    def test_change_email_already_taken(self, client):
+        # Register B (client cookie now belongs to B), then A, then A tries B's email.
+        _register(client, email="b@test.com", password="bpass1234")
+        _register(client, email="a@test.com", password="apass1234")  # cookie now = A
+        r = client.post(
+            "/auth/change-email",
+            json={"new_email": "b@test.com", "password": "apass1234"},
+        )
+        assert r.status_code == 409

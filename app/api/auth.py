@@ -21,6 +21,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import ComedAccount, Subscription, User
 from app.schemas import (
+    ChangeEmailRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
@@ -223,6 +224,28 @@ def update_profile(
         current_user.name = data["name"]
     if "timezone" in data:
         current_user.timezone = data["timezone"]
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return _user_out(db, current_user)
+
+
+@router.post("/change-email", response_model=UserOut)
+def change_email(
+    req: ChangeEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(req.password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Password is incorrect")
+    taken = (
+        db.query(User)
+        .filter(User.email == req.new_email, User.id != current_user.id)
+        .first()
+    )
+    if taken:
+        raise HTTPException(status_code=409, detail="That email is already in use")
+    current_user.email = req.new_email
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

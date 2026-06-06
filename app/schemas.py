@@ -114,6 +114,11 @@ class ChangePasswordRequest(BaseModel):
         return v
 
 
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    password: str
+
+
 class ProfileUpdateRequest(BaseModel):
     name: str | None = None
     timezone: str | None = None
