@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
+import "../components/AuthForm.css"; // reuses .auth-form / .auth-error / .auth-notice / .auth-submit
 import "./ProfilePage.css";
 
 const US_TIMEZONES = [
