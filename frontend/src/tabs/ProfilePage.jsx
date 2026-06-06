@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
+import Select from "../components/Select.jsx";
 import "../components/AuthForm.css"; // reuses .auth-form / .auth-error / .auth-notice / .auth-submit
 import "./ProfilePage.css";
 
@@ -93,15 +94,13 @@ export default function ProfilePage() {
             onChange={(e) => setName(e.target.value)}
           />
           <label htmlFor="pf-tz">Timezone</label>
-          <select
+          <Select
             id="pf-tz"
+            ariaLabel="Timezone"
             value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-          >
-            {US_TIMEZONES.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+            onChange={setTimezone}
+            options={US_TIMEZONES}
+          />
           <button className="auth-submit" type="submit" disabled={pState.busy}>
             {pState.busy ? "Working…" : "Save profile"}
           </button>
