@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import available_timezones
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -110,6 +111,33 @@ class ChangePasswordRequest(BaseModel):
     def password_min_length(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: str | None = None
+    timezone: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if len(v) > 100:
+            raise ValueError("Name must be at most 100 characters")
+        return v or None
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if v not in available_timezones():
+            raise ValueError("Unknown timezone")
         return v
 
 

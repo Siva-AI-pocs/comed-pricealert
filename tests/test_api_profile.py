@@ -19,3 +19,30 @@ class TestMeIncludesProfileFields:
         body = r.json()
         assert body["name"] is None
         assert body["timezone"] is None
+
+
+class TestUpdateProfile:
+    def test_update_name_and_timezone(self, client):
+        _register(client)
+        r = client.patch(
+            "/auth/me",
+            json={"name": "Siva D", "timezone": "America/Chicago"},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["name"] == "Siva D"
+        assert body["timezone"] == "America/Chicago"
+        # Persisted: a fresh GET reflects it.
+        me = client.get("/auth/me").json()
+        assert me["name"] == "Siva D"
+        assert me["timezone"] == "America/Chicago"
+
+    def test_invalid_timezone_rejected(self, client):
+        _register(client)
+        r = client.patch("/auth/me", json={"timezone": "Mars/Olympus_Mons"})
+        assert r.status_code == 422
+
+    def test_update_requires_auth(self, client):
+        # No registration → no cookie.
+        r = client.patch("/auth/me", json={"name": "x"})
+        assert r.status_code == 401

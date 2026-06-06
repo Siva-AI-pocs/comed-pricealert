@@ -24,6 +24,7 @@ from app.schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
+    ProfileUpdateRequest,
     RegisterRequest,
     ResetPasswordRequest,
     UserOut,
@@ -207,6 +208,24 @@ def reset_password(
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _user_out(db, current_user)
+
+
+@router.patch("/me", response_model=UserOut)
+def update_profile(
+    req: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # exclude_unset → only overwrite fields the client actually sent.
+    data = req.model_dump(exclude_unset=True)
+    if "name" in data:
+        current_user.name = data["name"]
+    if "timezone" in data:
+        current_user.timezone = data["timezone"]
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return _user_out(db, current_user)
 
 
