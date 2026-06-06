@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { authApi } from "./auth.js";
+import { setUnauthorizedHandler } from "./client.js";
 
 function okJson(body) {
   return Promise.resolve({
@@ -32,5 +33,44 @@ describe("authApi profile wrappers", () => {
       "/auth/change-email",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+});
+
+describe("401 handling for password-gated actions", () => {
+  function res401() {
+    return Promise.resolve({
+      ok: false,
+      status: 401,
+      headers: { get: () => "application/json" },
+      json: () => Promise.resolve({ detail: "Password is incorrect" }),
+      text: () => Promise.resolve(""),
+    });
+  }
+
+  it("changeEmail 401 does NOT trigger the global logout handler", async () => {
+    const onUnauth = vi.fn();
+    setUnauthorizedHandler(onUnauth);
+    global.fetch = vi.fn(() => res401());
+    await expect(authApi.changeEmail("new@test.com", "wrong")).rejects.toMatchObject({ status: 401 });
+    expect(onUnauth).not.toHaveBeenCalled();
+    setUnauthorizedHandler(null);
+  });
+
+  it("changePassword 401 does NOT trigger the global logout handler", async () => {
+    const onUnauth = vi.fn();
+    setUnauthorizedHandler(onUnauth);
+    global.fetch = vi.fn(() => res401());
+    await expect(authApi.changePassword("wrong", "newpassword1")).rejects.toMatchObject({ status: 401 });
+    expect(onUnauth).not.toHaveBeenCalled();
+    setUnauthorizedHandler(null);
+  });
+
+  it("updateProfile 401 DOES trigger the global logout handler (real session expiry)", async () => {
+    const onUnauth = vi.fn();
+    setUnauthorizedHandler(onUnauth);
+    global.fetch = vi.fn(() => res401());
+    await expect(authApi.updateProfile({ name: "x" })).rejects.toMatchObject({ status: 401 });
+    expect(onUnauth).toHaveBeenCalledTimes(1);
+    setUnauthorizedHandler(null);
   });
 });
