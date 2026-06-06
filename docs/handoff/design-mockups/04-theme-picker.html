@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComEd Price Pulse — Theme Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Hanken Grotesk',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;min-height:100vh;padding:24px 20px 70px;transition:background .3s,color .3s;
+    background-image:radial-gradient(900px 460px at 82% -10%,var(--accent)1f,transparent 60%)}
+  h1,h2,h3,.display{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em}
+  .wrap{max-width:1000px;margin:0 auto}
+
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .mark{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;
+    background:linear-gradient(145deg,var(--accent),var(--accent2));color:var(--on-accent);
+    box-shadow:0 10px 24px -8px var(--accent)}
+  .head h1{font-size:21px;font-weight:800}
+  .head p{font-size:12.5px;color:var(--faint)}
+  .lead{color:var(--dim);font-size:14px;max-width:640px;margin:8px 0 22px}
+
+  /* theme switcher */
+  .switch{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:24px;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;position:sticky;top:12px;z-index:9}
+  .switch .lbl{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-right:2px}
+  .tbtn{display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);background:transparent;color:var(--txt);
+    font-family:'Hanken Grotesk';font-weight:700;font-size:13.5px;padding:9px 14px;border-radius:11px;cursor:pointer;transition:.15s}
+  .tbtn:hover{border-color:var(--accent)}
+  .tbtn.on{border-color:var(--accent);background:var(--accent)14}
+  .tbtn .sw{display:flex;gap:3px}
+  .tbtn .sw i{width:11px;height:11px;border-radius:3px;display:block}
+  .mode{margin-left:auto;border:1px solid var(--line);background:var(--card);color:var(--txt);
+    width:40px;height:40px;border-radius:11px;cursor:pointer;font-size:16px}
+
+  .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;
+    box-shadow:0 18px 40px -22px rgba(0,0,0,.5)}
+  .card-lbl{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:12px}
+
+  /* price hero */
+  .status{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:12.5px;padding:6px 13px;border-radius:999px;
+    background:var(--cheap)1f;color:var(--cheap);border:1px solid var(--cheap)44}
+  .price{font-family:'Bricolage Grotesque';font-weight:800;font-size:66px;line-height:.95;letter-spacing:-.04em;
+    margin:14px 0 2px;display:flex;align-items:baseline;gap:4px}
+  .price .c{font-size:26px;color:var(--dim)}
+  .psub{color:var(--dim);font-size:14px}
+
+  /* tier scale */
+  .tiers{display:flex;flex-direction:column;gap:9px}
+  .tier{display:flex;align-items:center;gap:11px;font-size:13.5px;font-weight:600}
+  .tier .sw{width:26px;height:26px;border-radius:8px;flex:none}
+  .tier .rng{margin-left:auto;color:var(--faint);font-size:12.5px;font-weight:600}
+
+  .chartbox{height:200px;position:relative;margin-top:4px}
+
+  /* buttons + toggle */
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .btn{background:linear-gradient(145deg,var(--accent),var(--accent2));color:var(--on-accent);border:0;
+    font-family:'Hanken Grotesk';font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px;cursor:pointer;
+    box-shadow:0 10px 22px -10px var(--accent)}
+  .btn.ghost{background:transparent;color:var(--txt);border:1.5px solid var(--line);box-shadow:none}
+  .tog{display:flex;align-items:center;gap:11px;margin-top:4px}
+  .tog .n{font-weight:700;font-size:14px;flex:1}
+  .swt{width:46px;height:27px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:.2s}
+  .swt::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.2s}
+  .swt.on{background:var(--accent)}.swt.on::after{left:22px}
+
+  /* widget */
+  .widget{border-radius:20px;padding:16px;border:1px solid var(--line);
+    background:linear-gradient(155deg,var(--card),var(--bg))}
+  .widget .wh{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--faint)}
+  .widget .wp{font-family:'Bricolage Grotesque';font-weight:800;font-size:32px;margin:6px 0;display:flex;align-items:baseline;gap:3px}
+  .widget .wp .c{font-size:15px;color:var(--dim)}
+  .wbars{display:flex;align-items:flex-end;gap:3px;height:32px}.wbars span{flex:1;border-radius:2px}
+
+  .desc{font-size:13px;color:var(--dim);line-height:1.55;margin-top:14px}
+  .desc b{color:var(--txt)}
+  .pill{display:inline-block;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent)14;
+    border:1px solid var(--accent)33;border-radius:999px;padding:3px 10px;margin-bottom:8px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}.price{font-size:54px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="mark">⚡</div>
+    <div><h1>ComEd Price Pulse</h1><p>Pick a color theme</p></div>
+  </div>
+  <p class="lead">Three distinctive, non-purple directions. The price-tier scale (green→red) stays — it's semantic —
+    only the brand accent and surfaces change. Toggle light/dark too.</p>
+
+  <div class="switch">
+    <span class="lbl">Theme</span>
+    <button class="tbtn on" data-theme="voltaic"><span class="sw"><i style="background:#2f72ff"></i><i style="background:#38bdf8"></i></span>Voltaic</button>
+    <button class="tbtn" data-theme="grid"><span class="sw"><i style="background:#14b8a6"></i><i style="background:#2dd4bf"></i></span>Grid</button>
+    <button class="tbtn" data-theme="volt"><span class="sw"><i style="background:#c4f132"></i><i style="background:#9ade00"></i></span>Volt</button>
+    <button class="mode" id="modeBtn">🌙</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-lbl">Live price</div>
+      <span class="status">● Cheap — good time to run appliances</span>
+      <div class="price">1.70<span class="c">¢</span></div>
+      <div class="psub">per kWh · <span style="color:var(--cheap);font-weight:700">↓61%</span> vs 7-day avg</div>
+      <div class="chartbox" style="margin-top:18px"><canvas id="chart"></canvas></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn">Subscribe to alerts</button>
+        <button class="btn ghost">View forecast</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card">
+        <div class="card-lbl">Price-tier scale (kept)</div>
+        <div class="tiers">
+          <div class="tier"><span class="sw" style="background:var(--neg)"></span>Negative <span class="rng">&lt; 0¢</span></div>
+          <div class="tier"><span class="sw" style="background:var(--cheap)"></span>Cheap <span class="rng">0–3¢</span></div>
+          <div class="tier"><span class="sw" style="background:var(--moderate)"></span>Moderate <span class="rng">3–8¢</span></div>
+          <div class="tier"><span class="sw" style="background:var(--high)"></span>High <span class="rng">8–15¢</span></div>
+          <div class="tier"><span class="sw" style="background:var(--spike)"></span>Spike <span class="rng">15¢+</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-lbl">Components</div>
+        <div class="tog"><span class="n">Negative-price alert</span><span class="swt on" onclick="this.classList.toggle('on')"></span></div>
+        <div class="tog" style="margin-top:12px"><span class="n">Coincident-peak alert</span><span class="swt on" onclick="this.classList.toggle('on')"></span></div>
+        <div class="widget" style="margin-top:16px">
+          <div class="wh"><span>⚡ COMED PRICE</span><span style="color:var(--cheap)">● CHEAP</span></div>
+          <div class="wp">1.70<span class="c">¢/kWh</span></div>
+          <div class="wbars" id="wbars"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <span class="pill" id="themePill">Voltaic</span>
+    <div class="desc" id="themeDesc"></div>
+  </div>
+</div>
+
+<script>
+const THEMES={
+  voltaic:{
+    name:"Voltaic — electric blue",
+    desc:"<b>Clean, trustworthy, high-voltage.</b> An electric royal-blue accent on deep slate-navy. Reads as precise and utility-grade without being generic. Safest of the three — the blue is clearly distinct from every price tier, so nothing gets confused with a price signal.",
+    dark:{bg:"#0a0f1c",card:"#121a2e",line:"#20294150",txt:"#eaf0ff",dim:"#93a4c7",faint:"#5a6b91",accent:"#2f72ff",accent2:"#38bdf8",onA:"#ffffff",neg:"#06b6d4",cheap:"#10b981",moderate:"#f5b301",high:"#fb7a3c",spike:"#ef4444"},
+    light:{bg:"#f1f5fc",card:"#ffffff",line:"#e4e9f5",txt:"#0c1426",dim:"#51607e",faint:"#95a1bd",accent:"#1f5fff",accent2:"#2f8bff",onA:"#ffffff",neg:"#0891b2",cheap:"#059669",moderate:"#d97706",high:"#ea580c",spike:"#dc2626"}
+  },
+  grid:{
+    name:"Grid — control-room teal",
+    desc:"<b>Techy, calm, infrastructure.</b> A deep jade-teal accent on near-black ink with a faint green undertone — like a grid-operations console. Distinctive and modern; the teal sits between cyan and green but is bluer/darker than the 'cheap' tier, so it stays readable as a brand color.",
+    dark:{bg:"#08110f",card:"#0f1c1a",line:"#1c2e2b60",txt:"#e9f5f1",dim:"#8fb0a8",faint:"#54716b",accent:"#14b8a6",accent2:"#2dd4bf",onA:"#04201c",neg:"#0891b2",cheap:"#22c55e",moderate:"#eab308",high:"#f97316",spike:"#f43f5e"},
+    light:{bg:"#eef5f3",card:"#ffffff",line:"#dfeae7",txt:"#07140f",dim:"#4a655d",faint:"#8aa39b",accent:"#0d9488",accent2:"#14b8a6",onA:"#ffffff",neg:"#0891b2",cheap:"#16a34a",moderate:"#ca8a04",high:"#ea580c",spike:"#e11d48"}
+  },
+  volt:{
+    name:"Volt — neon lime",
+    desc:"<b>Bold, energetic, unmistakable.</b> A volt lime-chartreuse accent on warm near-black. The most daring option and the most 'electricity.' Trick: lime is used <i>only</i> for brand/buttons/active states — never on price data — so it lives in a different context than the green 'cheap' tier and the two never clash.",
+    dark:{bg:"#0c0d08",card:"#15170f",line:"#262a1a70",txt:"#f3f6e9",dim:"#aeb59a",faint:"#6b7258",accent:"#c4f132",accent2:"#9ade00",onA:"#10130a",neg:"#06b6d4",cheap:"#16a34a",moderate:"#f59e0b",high:"#f97316",spike:"#dc2626"},
+    light:{bg:"#f6f7ee",card:"#ffffff",line:"#e9ebda",txt:"#14150c",dim:"#5f6347",faint:"#9aa07f",accent:"#5f8c00",accent2:"#7cb900",onA:"#ffffff",neg:"#0891b2",cheap:"#16a34a",moderate:"#d97706",high:"#ea580c",spike:"#dc2626"}
+  }
+};
+let current="voltaic", mode="dark";
+const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+
+function apply(){
+  const c=THEMES[current][mode], r=document.body.style;
+  r.setProperty("--bg",c.bg);r.setProperty("--card",c.card);r.setProperty("--line",c.line);
+  r.setProperty("--txt",c.txt);r.setProperty("--dim",c.dim);r.setProperty("--faint",c.faint);
+  r.setProperty("--accent",c.accent);r.setProperty("--accent2",c.accent2);r.setProperty("--on-accent",c.onA);
+  r.setProperty("--neg",c.neg);r.setProperty("--cheap",c.cheap);r.setProperty("--moderate",c.moderate);
+  r.setProperty("--high",c.high);r.setProperty("--spike",c.spike);
+  document.getElementById("themePill").textContent=THEMES[current].name;
+  document.getElementById("themeDesc").innerHTML=THEMES[current].desc;
+  draw();drawWidget();
+}
+const tier=p=>p<0?css('--neg'):p<3?css('--cheap'):p<8?css('--moderate'):p<15?css('--high'):css('--spike');
+Chart.defaults.font.family="'Hanken Grotesk',sans-serif";
+let chart;
+function draw(){
+  chart?.destroy();
+  const ctx=document.getElementById('chart').getContext('2d');
+  const N=24,lab=[],p50=[],p10=[],p90=[],da=[];
+  for(let h=0;h<N;h++){const hod=(16+h)%24;let b=hod>=16&&hod<=20?6+(hod===17?9:2):hod<6?1+Math.random()*.6:2+Math.random()*1.5;
+    p50.push(+b.toFixed(1));p10.push(+Math.max(0,b-(b>6?b*.4:b*.2)).toFixed(1));p90.push(+(b+(b>6?b*.4:b*.2)).toFixed(1));
+    da.push(+(b*(b>6?.6:1.05)).toFixed(1));lab.push((hod%12||12)+(hod<12?'a':'p'));}
+  const g=ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,css('--accent')+'40');g.addColorStop(1,css('--accent')+'08');
+  chart=new Chart(ctx,{type:'line',data:{labels:lab,datasets:[
+    {data:p10,borderColor:'transparent',pointRadius:0},
+    {data:p90,borderColor:'transparent',backgroundColor:g,fill:'-1',pointRadius:0,tension:.4},
+    {data:p50,borderColor:css('--accent'),borderWidth:3,pointRadius:0,tension:.4,segment:{borderColor:s=>tier(s?.p1?.parsed?.y??0)}},
+    {data:da,borderColor:css('--faint'),borderWidth:1.5,borderDash:[5,4],pointRadius:0,tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:css('--faint'),font:{size:9},maxTicksLimit:8}},
+        y:{grid:{color:css('--line')},border:{display:false},ticks:{color:css('--faint'),font:{size:10},callback:v=>v+'¢'}}}}});
+}
+function drawWidget(){const w=document.getElementById('wbars');w.innerHTML='';
+  [17,5,2,1.7,1,1.4,1.7,1.9,1.3,1.5,1.8,1.6].forEach(v=>{const s=document.createElement('span');
+    s.style.height=Math.max(15,Math.min(100,v/18*100))+'%';s.style.background=tier(v);w.appendChild(s);});}
+
+document.querySelectorAll('.tbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  current=b.dataset.theme;apply();});
+document.getElementById('modeBtn').onclick=function(){mode=mode==='dark'?'light':'dark';
+  this.textContent=mode==='dark'?'🌙':'☀️';apply();};
+apply();
+</script>
+</body>
+</html>

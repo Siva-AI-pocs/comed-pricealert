@@ -1,0 +1,35 @@
+.meters-table {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 16px;
+  overflow-x: auto;
+}
+.meters-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.meters-table th {
+  text-align: left;
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 8px;
+}
+.meters-table td {
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+}
+.meter-remove {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--spike);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+}

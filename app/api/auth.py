@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from jose import JWTError
 from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_user
+from app.auth.deps import get_current_user, get_optional_user
 from app.auth.security import (
     create_access_token,
     decode_access_token,
@@ -16,41 +16,33 @@ from app.auth.security import (
     get_password_hash,
     verify_password,
 )
+from app.auth.session import set_auth_cookie as _set_auth_cookie
 from app.config import settings
 from app.database import get_db
 from app.models import ComedAccount, Subscription, User
 from app.schemas import (
+    ChangeEmailRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
+    ProfileUpdateRequest,
     RegisterRequest,
     ResetPasswordRequest,
     UserOut,
 )
-from app.services import notifier
+from app.services import audit, notifier
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_COOKIE_MAX_AGE = settings.jwt_expire_minutes * 60
-_SECURE_COOKIE = settings.app_base_url.startswith("https")
+# Precomputed hash used to equalize login timing for unknown emails, so a
+# missing account can't be distinguished from a wrong password by response time.
+_DUMMY_PASSWORD_HASH = get_password_hash("timing-equalizer-not-a-real-password")
 
 COMED_AUTH_URL = (
     "https://secure.comed.com/MyAccount/MyBillUsage/pages/GBCThirdPartyReg.aspx"
 )
 COMED_TOKEN_URL = "https://secure.comed.com/sso/oauth2/access_token"
 COMED_SCOPE = "FB=4_5_15;IntervalDuration=900;BlockDuration=monthly;HistoryLength=13"
-
-
-def _set_auth_cookie(response: JSONResponse, token: str) -> None:
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        samesite="lax",
-        max_age=_COOKIE_MAX_AGE,
-        secure=_SECURE_COOKIE,
-        path="/",
-    )
 
 
 def _claim_orphan_subscriptions(db: Session, user: User) -> None:
@@ -64,8 +56,24 @@ def _claim_orphan_subscriptions(db: Session, user: User) -> None:
     db.commit()
 
 
+def _user_out(db: Session, user: User) -> UserOut:
+    """Build the UserOut response, including computed comed_connected + profile fields."""
+    comed_connected = (
+        db.query(ComedAccount).filter(ComedAccount.user_id == user.id).first()
+        is not None
+    )
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        created_at=user.created_at,
+        comed_connected=comed_connected,
+        name=user.name,
+        timezone=user.timezone,
+    )
+
+
 @router.post("/register", response_model=UserOut)
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
+def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
     user = User(
@@ -76,39 +84,58 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     _claim_orphan_subscriptions(db, user)
-    token = create_access_token({"sub": str(user.id)})
-    out = UserOut(
-        id=user.id, email=user.email, created_at=user.created_at, comed_connected=False
+    audit.record_auth_event(
+        db, request, audit.REGISTER, user_id=user.id, email=user.email
     )
+    token = create_access_token({"sub": str(user.id)})
+    out = _user_out(db, user)
     resp = JSONResponse(content=out.model_dump(mode="json"))
     _set_auth_cookie(resp, token)
     return resp
 
 
 @router.post("/login", response_model=UserOut)
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
-    if not user or not verify_password(req.password, user.hashed_password):
+    # Always run a bcrypt verify (against a dummy hash when the user is unknown)
+    # so login time doesn't reveal whether an email is registered.
+    password_ok = verify_password(
+        req.password, user.hashed_password if user else _DUMMY_PASSWORD_HASH
+    )
+    if not user or not password_ok:
+        audit.record_auth_event(
+            db,
+            request,
+            audit.LOGIN_FAILURE,
+            user_id=user.id if user else None,
+            email=req.email,
+            success=False,
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
     _claim_orphan_subscriptions(db, user)
+    audit.record_auth_event(
+        db, request, audit.LOGIN_SUCCESS, user_id=user.id, email=user.email
+    )
     token = create_access_token({"sub": str(user.id)})
-    comed_connected = (
-        db.query(ComedAccount).filter(ComedAccount.user_id == user.id).first()
-        is not None
-    )
-    out = UserOut(
-        id=user.id,
-        email=user.email,
-        created_at=user.created_at,
-        comed_connected=comed_connected,
-    )
+    out = _user_out(db, user)
     resp = JSONResponse(content=out.model_dump(mode="json"))
     _set_auth_cookie(resp, token)
     return resp
 
 
 @router.post("/logout")
-def logout():
+def logout(
+    request: Request,
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    audit.record_auth_event(
+        db,
+        request,
+        audit.LOGOUT,
+        user_id=current_user.id if current_user else None,
+        email=current_user.email if current_user else None,
+    )
     resp = JSONResponse(content={"message": "Logged out"}, status_code=200)
     resp.delete_cookie(key="access_token", path="/")
     return resp
@@ -117,6 +144,7 @@ def logout():
 @router.post("/change-password")
 def change_password(
     req: ChangePasswordRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -125,6 +153,13 @@ def change_password(
     current_user.hashed_password = get_password_hash(req.new_password)
     db.add(current_user)
     db.commit()
+    audit.record_auth_event(
+        db,
+        request,
+        audit.PASSWORD_CHANGE,
+        user_id=current_user.id,
+        email=current_user.email,
+    )
     # The session cookie is keyed on user id, so it stays valid — no re-login needed.
     return {"message": "Password changed"}
 
@@ -150,7 +185,9 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/reset-password")
-def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+def reset_password(
+    req: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)
+):
     user = db.query(User).filter(User.email == req.email).first()
     invalid = HTTPException(status_code=400, detail="Invalid or expired reset code")
     if not user or not user.reset_code_hash or not user.reset_code_expires_at:
@@ -164,21 +201,55 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     user.reset_code_expires_at = None
     db.add(user)
     db.commit()
+    audit.record_auth_event(
+        db, request, audit.PASSWORD_RESET, user_id=user.id, email=user.email
+    )
     return {"message": "Password reset — you can now log in."}
 
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    comed_connected = (
-        db.query(ComedAccount).filter(ComedAccount.user_id == current_user.id).first()
-        is not None
+    return _user_out(db, current_user)
+
+
+@router.patch("/me", response_model=UserOut)
+def update_profile(
+    req: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # exclude_unset → only overwrite fields the client actually sent.
+    data = req.model_dump(exclude_unset=True)
+    if "name" in data:
+        current_user.name = data["name"]
+    if "timezone" in data:
+        current_user.timezone = data["timezone"]
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return _user_out(db, current_user)
+
+
+@router.post("/change-email", response_model=UserOut)
+def change_email(
+    req: ChangeEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(req.password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Password is incorrect")
+    taken = (
+        db.query(User)
+        .filter(User.email == req.new_email, User.id != current_user.id)
+        .first()
     )
-    return UserOut(
-        id=current_user.id,
-        email=current_user.email,
-        created_at=current_user.created_at,
-        comed_connected=comed_connected,
-    )
+    if taken:
+        raise HTTPException(status_code=409, detail="That email is already in use")
+    current_user.email = req.new_email
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return _user_out(db, current_user)
 
 
 @router.get("/comed/connect")

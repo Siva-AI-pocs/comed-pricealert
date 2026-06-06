@@ -1,0 +1,19 @@
+.usage-h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 22px 0 6px;
+}
+.shift-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--dim);
+  font-size: 14px;
+  margin: 8px 0 14px;
+}
+.shift-control input[type="range"] {
+  flex: 1;
+  min-width: 180px;
+  accent-color: var(--accent);
+}

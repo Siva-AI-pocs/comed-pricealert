@@ -55,6 +55,8 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timezone: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Password-reset code (bcrypt-hashed) and its expiry, set during forgot-password.
     reset_code_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -102,6 +104,10 @@ class Subscription(Base):
     threshold_cents: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     high_threshold_cents: Mapped[float | None] = mapped_column(
         Float, nullable=True, default=None
+    )
+    # Opt-in (default on) for the "grid is paying you" negative-price alert.
+    notify_negative: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
     )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -183,4 +189,65 @@ class AlertLog(Base):
 
     subscription: Mapped["Subscription"] = relationship(
         "Subscription", back_populates="alerts"
+    )
+
+
+class PriceForecast(Base):
+    """48h probabilistic forecast rows (written by the offline/baseline job).
+
+    New table — created by ``Base.metadata.create_all``. The API only reads the
+    most recent ``generated_at`` batch; ``UNIQUE(target_ts, generated_at)`` keeps
+    a re-run for the same instant idempotent.
+    """
+
+    __tablename__ = "price_forecast"
+    __table_args__ = (
+        UniqueConstraint("target_ts", "generated_at", name="uq_forecast_target_gen"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    target_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    p10: Mapped[float] = mapped_column(Float, nullable=False)
+    p50: Mapped[float] = mapped_column(Float, nullable=False)
+    p90: Mapped[float] = mapped_column(Float, nullable=False)
+    spike_prob: Mapped[float | None] = mapped_column(Float, nullable=True)
+    da_lmp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_version: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
+
+
+class PriceActual(Base):
+    """Settled real-time price per hour, for scoring forecast accuracy."""
+
+    __tablename__ = "price_actual"
+
+    target_ts: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    rt_price: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class LoginAudit(Base):
+    """Audit trail of authentication events (login, logout, register, etc.).
+
+    A new table, so it is created by ``Base.metadata.create_all`` in
+    ``init_db`` — no manual column migration needed.
+    """
+
+    __tablename__ = "login_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # Nullable: a failed login for an unknown email has no user.
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, index=True
+    )
+    email: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    # One of: login_success, login_failure, logout, register,
+    # password_reset, password_change.
+    event_type: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
     )

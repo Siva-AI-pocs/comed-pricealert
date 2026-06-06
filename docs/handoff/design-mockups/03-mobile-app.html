@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComEd Price Pulse — Mobile App Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0c0f17; --card:#161b27; --card-2:#1b2230; --line:#252d3d; --line-soft:#1e2533;
+    --txt:#eef2fb; --dim:#9aa6bf; --faint:#5f6b85; --accent:#7c5cff; --accent-soft:#7c5cff22;
+    --cheap:#34d399; --moderate:#fbbf24; --high:#fb923c; --spike:#f87171; --neg:#22d3ee;
+    --radius:18px;
+  }
+  [data-theme="light"]{--bg:#eef1f8;--card:#fff;--card-2:#f5f7fc;--line:#e6eaf3;--line-soft:#eef1f8;
+    --txt:#10141f;--dim:#5a647a;--faint:#9aa3ba;--accent:#4f46e5;--accent-soft:#4f46e514;
+    --cheap:#16a34a;--neg:#0891b2;--moderate:#d97706;--high:#ea580c;--spike:#dc2626;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Hanken Grotesk',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;min-height:100vh;padding:26px 18px 60px;
+    background-image:radial-gradient(900px 460px at 80% -10%,var(--accent-soft),transparent 60%)}
+  h1,h2,h3,.display{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em}
+  .wrap{max-width:1080px;margin:0 auto}
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+  .top .mark{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+    background:linear-gradient(145deg,var(--accent),#9f7bff);font-size:18px}
+  .top h1{font-size:20px;font-weight:800}
+  .top p{font-size:12.5px;color:var(--faint)}
+  .icon-btn{margin-left:auto;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);
+    background:var(--card);color:var(--txt);cursor:pointer;font-size:15px}
+  .lead{color:var(--dim);font-size:14px;max-width:620px;margin:6px 0 24px}
+
+  .stage{display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+
+  /* phone */
+  .phone{width:330px;height:680px;border-radius:42px;background:var(--card);
+    border:1px solid var(--line);padding:11px;box-shadow:0 40px 80px -30px rgba(0,0,0,.6);position:relative;flex:none}
+  .screen{width:100%;height:100%;border-radius:32px;overflow:hidden;background:var(--bg);
+    display:flex;flex-direction:column;position:relative}
+  .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:110px;height:26px;
+    background:var(--card);border-radius:0 0 16px 16px;z-index:5;border:1px solid var(--line);border-top:0}
+  .sbar{display:flex;justify-content:space-between;padding:14px 22px 6px;font-size:12px;font-weight:700;color:var(--dim)}
+  .body{flex:1;overflow-y:auto;padding:4px 16px 16px}
+  .body::-webkit-scrollbar{display:none}
+  .pscreen{display:none}.pscreen.on{display:block;animation:fade .3s}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1}}
+
+  .h-status{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:12px;padding:5px 11px;
+    border-radius:999px;margin-top:6px}
+  .price{font-family:'Bricolage Grotesque';font-weight:800;font-size:58px;line-height:1;letter-spacing:-.04em;
+    margin:10px 0 2px;display:flex;align-items:baseline;gap:3px}
+  .price .c{font-size:24px;color:var(--dim)}
+  .price-sub{color:var(--dim);font-size:13px}
+  .stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+  .stat{background:var(--card);border:1px solid var(--line-soft);border-radius:12px;padding:9px 10px}
+  .stat .k{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .stat .v{font-family:'Bricolage Grotesque';font-weight:700;font-size:16px;margin-top:2px}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px;margin-top:13px}
+  .pcard h4{font-size:13px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:7px}
+  .win{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--line-soft)}
+  .win:first-of-type{border-top:0}
+  .win .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--w)1f}
+  .win .when{font-family:'Bricolage Grotesque';font-weight:700;font-size:15px}
+  .win .lbl{font-size:11.5px;color:var(--dim)}
+  .win .bd{margin-left:auto;font-weight:700;font-size:13px;color:var(--w)}
+  .chip-new{font-size:9px;font-weight:800;letter-spacing:.04em;color:#fff;background:var(--accent);
+    border-radius:5px;padding:2px 6px;text-transform:uppercase}
+  .mini-chart{height:120px;position:relative;margin-top:6px}
+  .banner{background:var(--neg)1a;border:1px solid var(--neg)55;border-radius:12px;padding:11px 13px;margin-top:13px;
+    font-size:12.5px;color:var(--txt)}
+  .banner b{color:var(--neg)}
+
+  /* alert toggles */
+  .toggle{display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid var(--line-soft)}
+  .toggle:first-of-type{border-top:0}
+  .toggle .t-txt{flex:1}
+  .toggle .t-txt .n{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px}
+  .toggle .t-txt .d{font-size:11.5px;color:var(--dim)}
+  .sw{width:42px;height:25px;border-radius:999px;background:var(--line);position:relative;flex:none;cursor:pointer;transition:.2s}
+  .sw::after{content:"";position:absolute;top:2.5px;left:2.5px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+  .sw.on{background:var(--accent)}.sw.on::after{left:19.5px}
+  .ch-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+  .ch{font-size:11.5px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:5px 11px;color:var(--dim)}
+  .ch.on{border-color:var(--accent);background:var(--accent-soft);color:var(--txt)}
+  .listitem{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line-soft);font-weight:600;font-size:14px}
+  .listitem .ic{font-size:17px}.listitem .ar{margin-left:auto;color:var(--faint)}
+
+  /* bottom nav */
+  .bnav{display:flex;background:var(--card);border-top:1px solid var(--line);padding:8px 4px 6px}
+  .bnav button{flex:1;border:0;background:transparent;color:var(--faint);font-family:'Hanken Grotesk';
+    font-weight:600;font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .bnav button .bi{font-size:18px;filter:grayscale(1);opacity:.6}
+  .bnav button.on{color:var(--accent)}.bnav button.on .bi{filter:none;opacity:1}
+
+  /* extras column */
+  .extras{display:flex;flex-direction:column;gap:18px;width:320px;flex:none}
+  .extras h3{font-size:14px;font-weight:700;margin-bottom:-6px;color:var(--dim)}
+  .widget{background:linear-gradient(155deg,#1c2230,#11151f);border:1px solid var(--line);border-radius:22px;
+    padding:16px;color:#eef2fb;box-shadow:0 20px 40px -20px rgba(0,0,0,.5)}
+  [data-theme="light"] .widget{background:linear-gradient(155deg,#fff,#f3f5fb)}
+  .widget .wh{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;color:var(--faint)}
+  .widget .wp{font-family:'Bricolage Grotesque';font-weight:800;font-size:34px;margin:6px 0 2px;display:flex;align-items:baseline;gap:3px}
+  .widget .wp .c{font-size:16px;color:var(--dim)}
+  .wbars{display:flex;align-items:flex-end;gap:3px;height:34px;margin-top:8px}
+  .wbars span{flex:1;border-radius:2px}
+  .lock{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;gap:12px;align-items:flex-start}
+  .lock .ic{width:34px;height:34px;border-radius:9px;background:var(--neg)1f;display:grid;place-items:center;font-size:17px;flex:none}
+  .lock .l-t{font-size:11px;color:var(--faint);font-weight:700}
+  .lock .l-m{font-size:13px;font-weight:600;margin-top:2px}
+  .lock .l-m b{color:var(--neg)}
+  .watch{display:flex;align-items:center;gap:14px}
+  .watch .face{width:74px;height:88px;border-radius:24px;background:#0a0d14;border:3px solid #222;display:grid;place-items:center;flex:none}
+  .watch .ring{width:54px;height:54px;border-radius:50%;border:5px solid var(--cheap);display:grid;place-items:center;
+    font-family:'Bricolage Grotesque';font-weight:800;font-size:15px;color:#fff}
+  .watch .w-cap{font-size:12.5px;color:var(--dim)}
+  .note{font-size:12px;color:var(--faint);line-height:1.5}
+  @media(max-width:720px){.extras{width:330px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="mark">⚡</div>
+    <div><h1>ComEd Price Pulse</h1><p>Updated UI/UX · mobile app</p></div>
+    <button class="icon-btn" id="themeBtn">🌙</button>
+  </div>
+  <p class="lead">Same React codebase, wrapped with Capacitor for the App Store &amp; Play. New features in place:
+    day-ahead price, negative-price &amp; coincident-peak alerts, automation, and the forecast. Tap the bottom nav.</p>
+
+  <div class="stage">
+    <!-- PHONE -->
+    <div class="phone">
+      <div class="screen">
+        <div class="notch"></div>
+        <div class="sbar"><span>9:41</span><span>● ⚡ 100%</span></div>
+        <div class="body">
+
+          <!-- NOW -->
+          <div class="pscreen on" id="s-now">
+            <span class="h-status" style="background:var(--cheap)1f;color:var(--cheap)">● Cheap — good time to run appliances</span>
+            <div class="price">1.70<span class="c">¢</span></div>
+            <div class="price-sub">per kWh · <span style="color:var(--cheap);font-weight:700">↓61%</span> vs 7-day avg</div>
+            <div class="stat-row">
+              <div class="stat"><div class="k">Low</div><div class="v" style="color:var(--neg)">0.6¢</div></div>
+              <div class="stat"><div class="k">High</div><div class="v" style="color:var(--spike)">2.3¢</div></div>
+              <div class="stat"><div class="k">Day-ahead <span class="chip-new">new</span></div><div class="v">2.1¢</div></div>
+            </div>
+            <div class="pcard">
+              <h4>⏱️ When to use power today</h4>
+              <div class="win" style="--w:var(--cheap)"><div class="ic">🟢</div>
+                <div><div class="when">2 – 5 AM</div><div class="lbl">cheapest window</div></div><div class="bd">~1.1¢</div></div>
+              <div class="win" style="--w:var(--neg)"><div class="ic">💧</div>
+                <div><div class="when">Now → 4 PM</div><div class="lbl">good · laundry, dishwasher</div></div><div class="bd">~1.8¢</div></div>
+              <div class="win" style="--w:var(--spike)"><div class="ic">🔴</div>
+                <div><div class="when">5 – 8 PM</div><div class="lbl">avoid · evening peak</div></div><div class="bd">~9.7¢</div></div>
+            </div>
+            <div class="pcard"><h4>Today's price by hour</h4><div class="mini-chart"><canvas id="cNow"></canvas></div></div>
+          </div>
+
+          <!-- FORECAST -->
+          <div class="pscreen" id="s-fc">
+            <span class="h-status" style="background:var(--accent-soft);color:var(--accent)">📈 48-hour forecast</span>
+            <div class="pcard" style="margin-top:13px">
+              <h4>Predicted price <span style="color:var(--faint);font-weight:500;font-size:11px">· model MAE 0.8¢ · 31% better than day-ahead</span></h4>
+              <div class="mini-chart" style="height:150px"><canvas id="cFc"></canvas></div>
+            </div>
+            <div class="pcard">
+              <h4>📅 Plan tomorrow</h4>
+              <div class="win" style="--w:var(--cheap)"><div class="ic">🟢</div>
+                <div><div class="when">1 – 4 AM</div><div class="lbl">cheapest · 88% confidence</div></div><div class="bd">~1.0¢</div></div>
+              <div class="win" style="--w:var(--spike)"><div class="ic">⚠️</div>
+                <div><div class="when">4 – 7 PM</div><div class="lbl">spike risk</div></div><div class="bd">41%</div></div>
+            </div>
+            <div class="banner" style="background:var(--high)1a;border-color:var(--high)55">
+              ⚡ <b style="color:var(--high)">Coincident-peak risk tomorrow.</b> Cutting use 3–6 PM could lower the capacity charge on your bill. <span class="chip-new">new</span></div>
+          </div>
+
+          <!-- ALERTS -->
+          <div class="pscreen" id="s-alerts">
+            <span class="h-status" style="background:var(--accent-soft);color:var(--accent)">🔔 Alerts &amp; automation</span>
+            <div class="pcard" style="margin-top:13px">
+              <h4>Notify me when…</h4>
+              <div class="toggle"><div class="t-txt"><div class="n">Price drops below 2¢</div><div class="d">low-price window</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="toggle"><div class="t-txt"><div class="n">Price spikes above 10¢</div><div class="d">avoid usage</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="toggle"><div class="t-txt"><div class="n">Price goes negative <span class="chip-new">new</span></div><div class="d">the grid pays you</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="toggle"><div class="t-txt"><div class="n">Coincident-peak day <span class="chip-new">new</span></div><div class="d">cut the capacity charge</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+            </div>
+            <div class="pcard">
+              <h4>Channels</h4>
+              <div class="ch-row"><span class="ch on">📧 Email</span><span class="ch on">✈️ Telegram</span><span class="ch">💬 WhatsApp</span><span class="ch on">🔔 Push</span></div>
+            </div>
+            <div class="pcard">
+              <h4>Automation <span class="chip-new">new</span></h4>
+              <div class="toggle"><div class="t-txt"><div class="n">⚙️ Webhook</div><div class="d">POST on price events</div></div><div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="toggle"><div class="t-txt"><div class="n">🔗 IFTTT</div><div class="d">turn on devices when cheap</div></div><div class="sw" onclick="this.classList.toggle('on')"></div></div>
+              <div class="toggle"><div class="t-txt"><div class="n">🏠 HomeKit / Home Assistant</div><div class="d">native rules</div></div><div class="sw" onclick="this.classList.toggle('on')"></div></div>
+            </div>
+          </div>
+
+          <!-- MORE -->
+          <div class="pscreen" id="s-more">
+            <span class="h-status" style="background:var(--accent-soft);color:var(--accent)">⋯ More</span>
+            <div class="pcard" style="margin-top:13px;padding:4px 14px">
+              <div class="listitem"><span class="ic">📊</span>Usage &amp; savings<span class="ar">›</span></div>
+              <div class="listitem"><span class="ic">💡</span>Load-shift tips <span class="chip-new">new</span><span class="ar">›</span></div>
+              <div class="listitem"><span class="ic">📅</span>7-day history<span class="ar">›</span></div>
+              <div class="listitem"><span class="ic">📁</span>My ComEd data (Green Button)<span class="ar">›</span></div>
+              <div class="listitem" style="border-bottom:0"><span class="ic">⚙️</span>Settings<span class="ar">›</span></div>
+            </div>
+            <div class="pcard">
+              <h4>This month</h4>
+              <div class="price" style="font-size:40px;color:var(--cheap)">$34<span class="c">.41 saved</span></div>
+              <div class="price-sub">vs a flat 8.5¢ rate</div>
+            </div>
+          </div>
+
+        </div>
+        <!-- bottom nav -->
+        <div class="bnav">
+          <button class="on" data-s="now"><span class="bi">⚡</span>Now</button>
+          <button data-s="fc"><span class="bi">📈</span>Forecast</button>
+          <button data-s="alerts"><span class="bi">🔔</span>Alerts</button>
+          <button data-s="more"><span class="bi">⋯</span>More</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXTRAS -->
+    <div class="extras">
+      <h3>Home-screen widget</h3>
+      <div class="widget">
+        <div class="wh"><span>⚡ COMED PRICE</span><span style="color:var(--cheap)">● CHEAP</span></div>
+        <div class="wp">1.70<span class="c">¢/kWh</span></div>
+        <div class="wbars" id="wbars"></div>
+      </div>
+
+      <h3>Lock-screen alert</h3>
+      <div class="lock">
+        <div class="ic">⚡</div>
+        <div><div class="l-t">COMED PRICE PULSE · now</div>
+          <div class="l-m">Price just went <b>negative (−1.6¢)</b> — the grid's paying you. Run big loads now.</div></div>
+      </div>
+
+      <h3>Apple Watch</h3>
+      <div class="watch">
+        <div class="face"><div class="ring">1.7¢</div></div>
+        <div class="w-cap">Glanceable complication — color shifts green→red with the price tier, on any watch face.</div>
+      </div>
+
+      <p class="note">These native touches (widget, lock-screen live price, watch complication) match the one polished iOS
+        competitor — and the forecast, coincident-peak alert, and whole-home tips are what it <i>doesn't</i> have.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+const tier=p=>p<0?css('--neg'):p<3?css('--cheap'):p<8?css('--moderate'):p<15?css('--high'):css('--spike');
+Chart.defaults.font.family="'Hanken Grotesk',sans-serif";
+
+const hours=['5P','7P','9P','11P','1A','3A','5A','7A','9A','11A','1P','3P'];
+const hp=[17,4.8,1.7,2.0,1.9,1.0,1.4,1.7,1.9,1.3,1.5,1.8];
+let charts={};
+function drawNow(){charts.now?.destroy();charts.now=new Chart(document.getElementById('cNow'),{type:'bar',
+  data:{labels:hours,datasets:[{data:hp,backgroundColor:hp.map(tier),borderRadius:4,maxBarThickness:14}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{color:css('--faint'),font:{size:9},maxTicksLimit:7}},
+      y:{grid:{color:css('--line-soft')},border:{display:false},ticks:{color:css('--faint'),font:{size:9},maxTicksLimit:4,callback:v=>v+'¢'}}}}});}
+function drawFc(){charts.fc?.destroy();const ctx=document.getElementById('cFc').getContext('2d');
+  const N=24,p50=[],p10=[],p90=[],da=[],lb=[];
+  for(let h=0;h<N;h++){const hod=(16+h*2)%24;let b=hod>=16&&hod<=20?6+(hod===17?8:2):hod<6?1+Math.random():2+Math.random()*1.5;
+    p50.push(+b.toFixed(1));p10.push(+Math.max(0,b-(b>6?b*.4:b*.2)).toFixed(1));p90.push(+(b+(b>6?b*.4:b*.2)).toFixed(1));
+    da.push(+(b*(b>6?.6:1.05)).toFixed(1));lb.push((hod%12||12)+(hod<12?'A':'P'));}
+  const g=ctx.createLinearGradient(0,0,0,150);g.addColorStop(0,css('--accent')+'44');g.addColorStop(1,css('--accent')+'08');
+  charts.fc=new Chart(ctx,{type:'line',data:{labels:lb,datasets:[
+    {data:p10,borderColor:'transparent',pointRadius:0},
+    {data:p90,borderColor:'transparent',backgroundColor:g,fill:'-1',pointRadius:0,tension:.4},
+    {data:p50,borderColor:css('--accent'),borderWidth:2.5,pointRadius:0,tension:.4},
+    {data:da,borderColor:css('--faint'),borderWidth:1.5,borderDash:[5,4],pointRadius:0,tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:css('--faint'),font:{size:9},maxTicksLimit:6}},
+        y:{grid:{color:css('--line-soft')},border:{display:false},ticks:{color:css('--faint'),font:{size:9},maxTicksLimit:4,callback:v=>v+'¢'}}}}});}
+function drawWidget(){const w=document.getElementById('wbars');w.innerHTML='';
+  hp.slice(0,12).forEach(v=>{const s=document.createElement('span');s.style.height=Math.max(15,Math.min(100,v/18*100))+'%';
+    s.style.background=tier(v);w.appendChild(s);});}
+
+function renderActive(){const a=document.querySelector('.bnav button.on').dataset.s;
+  if(a==='now')drawNow(); if(a==='fc')drawFc();}
+document.querySelectorAll('.bnav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.bnav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.pscreen').forEach(x=>x.classList.remove('on'));
+  document.getElementById('s-'+b.dataset.s).classList.add('on');renderActive();});
+document.getElementById('themeBtn').onclick=function(){const l=document.body.getAttribute('data-theme')==='light';
+  document.body.setAttribute('data-theme',l?'':'light');this.textContent=l?'🌙':'☀️';
+  Object.values(charts).forEach(c=>c?.destroy());charts={};renderActive();drawWidget();};
+drawNow();drawWidget();
+</script>
+</body>
+</html>

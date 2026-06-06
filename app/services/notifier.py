@@ -26,7 +26,12 @@ def _build_message(
     now_ct = datetime.now(COMED_TZ)
     ts = now_ct.strftime("%Y-%m-%d %I:%M %p CT")
 
-    if direction == "high":
+    if direction == "negative":
+        headline = "⚡ ComEd Negative Price — the grid is paying you!"
+        label = "price is below 0¢ — great time to run everything"
+        price_tag = f"  ← {label}" if price <= 0 else ""
+        avg_tag = ""
+    elif direction == "high":
         headline = "⬆️ ComEd High Price Alert"
         label = f"above your {threshold:.2f}¢ high alert"
         price_tag = f"  ← {label}" if price >= threshold else ""
@@ -212,12 +217,17 @@ async def check_and_notify(db: Session, current_price: float) -> None:
     base_price = hourly_avg if hourly_avg is not None else current_price
 
     for sub in subs:
+        # Negative-price alert keys off the 5-min SPOT price (not the hour avg)
+        # so the "grid is paying you" moment isn't averaged away.
+        should_alert_negative = (
+            getattr(sub, "notify_negative", True) and current_price <= 0
+        )
         should_alert_low = base_price <= sub.threshold_cents
         should_alert_high = (
             sub.high_threshold_cents is not None
             and base_price >= sub.high_threshold_cents
         )
-        if not (should_alert_low or should_alert_high):
+        if not (should_alert_negative or should_alert_low or should_alert_high):
             logger.debug(
                 "sub_id=%d skipped: price=%.2f not crossing low=%.2f high=%s",
                 sub.id,
@@ -242,7 +252,10 @@ async def check_and_notify(db: Session, current_price: float) -> None:
                 )
                 continue
 
-        if should_alert_high:
+        if should_alert_negative:
+            direction = "negative"
+            threshold_for_msg = 0.0
+        elif should_alert_high:
             direction = "high"
             threshold_for_msg = sub.high_threshold_cents
         else:

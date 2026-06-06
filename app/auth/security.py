@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from cryptography.fernet import Fernet
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
 
 from app.config import settings
@@ -24,13 +24,15 @@ def generate_numeric_code(digits: int = 6) -> str:
 
 
 def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(
         minutes=expires_minutes
         if expires_minutes is not None
         else settings.jwt_expire_minutes
     )
+    # iat lets the sliding-refresh middleware measure token age.
     return jwt.encode(
-        {**data, "exp": expire},
+        {**data, "iat": now, "exp": expire},
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
     )

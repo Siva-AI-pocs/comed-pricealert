@@ -185,7 +185,12 @@ async def poll_and_store() -> None:
         inserted = _upsert_rows(db, data)
         logger.info("Poll complete: %d new rows", inserted)
 
-        recompute_hourly_averages(db, since_hours_ago=2)
+        # Recompute the full window the ComEd 5-min feed can return (~24h), not
+        # just the last 2h. On startup or after downtime the feed backfills many
+        # hours at once; a 2h window would leave all but the last two of those
+        # hours without an hourly average (gaps in the "price by hour" chart).
+        # Cheap and idempotent, so running it every poll keeps the table healed.
+        recompute_hourly_averages(db, since_hours_ago=26)
     finally:
         db.close()
 

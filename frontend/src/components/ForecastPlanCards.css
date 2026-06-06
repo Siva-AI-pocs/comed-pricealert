@@ -1,0 +1,50 @@
+.fc-plan {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 14px 0;
+}
+.fc-pcard {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 4px solid;
+  border-radius: 15px;
+  padding: 16px;
+}
+.fc-pic {
+  font-size: 21px;
+}
+.fc-pk {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 700;
+  margin-top: 8px;
+}
+.fc-pwhen {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  margin-top: 3px;
+}
+.fc-pmeta {
+  font-size: 13px;
+  color: var(--dim);
+  margin-top: 5px;
+}
+.fc-pconf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-top: 10px;
+}
+@media (max-width: 760px) {
+  .fc-plan {
+    grid-template-columns: 1fr;
+  }
+}

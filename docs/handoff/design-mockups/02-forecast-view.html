@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComEd Price Pulse — Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0c0f17; --card:#161b27; --card-2:#1b2230; --line:#252d3d; --line-soft:#1e2533;
+    --txt:#eef2fb; --txt-dim:#9aa6bf; --txt-faint:#5f6b85;
+    --accent:#7c5cff; --accent-soft:#7c5cff22;
+    --cheap:#34d399; --moderate:#fbbf24; --high:#fb923c; --spike:#f87171; --neg:#22d3ee;
+    --shadow:0 18px 40px -18px rgba(0,0,0,.7); --radius:18px;
+  }
+  [data-theme="light"]{--bg:#f4f6fb;--card:#fff;--card-2:#f7f9fd;--line:#e6eaf3;--line-soft:#eef1f8;
+    --txt:#10141f;--txt-dim:#5a647a;--txt-faint:#9aa3ba;--accent-soft:#7c5cff14;--shadow:0 16px 36px -20px rgba(31,41,72,.28);}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Hanken Grotesk',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;min-height:100vh;
+    background-image:radial-gradient(1100px 500px at 85% -8%,var(--accent-soft),transparent 60%)}
+  h1,h2,h3,.display{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 22px 60px}
+  .muted{color:var(--txt-dim)} .faint{color:var(--txt-faint)}
+
+  .head{display:flex;align-items:flex-start;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+  .head .ttl h1{font-size:26px;font-weight:800}
+  .head .ttl p{color:var(--txt-dim);font-size:14px;margin-top:3px}
+  .acc-badge{margin-left:auto;display:flex;align-items:center;gap:13px;background:var(--card);
+    border:1px solid var(--cheap)44;border-radius:14px;padding:11px 16px;box-shadow:var(--shadow)}
+  .acc-badge .big{font-family:'Bricolage Grotesque';font-weight:800;font-size:26px;color:var(--cheap);line-height:1}
+  .acc-badge .lbl{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--txt-faint);font-weight:600}
+  .acc-badge .sub{font-size:12.5px;color:var(--txt-dim);max-width:150px}
+  .icon-btn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--card);
+    color:var(--txt);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.15s}
+  .icon-btn:hover{border-color:var(--accent)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+  .card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px}
+  .card-h h3{font-size:15px;font-weight:700}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--txt-dim);font-weight:600}
+  .legend i{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px;border-radius:2px}
+  .legend .band{height:11px;width:16px;border-top:0;border-radius:3px;background:var(--accent)33}
+  .chart-box{position:relative;height:300px;margin-top:14px}
+
+  .seg{display:inline-flex;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .seg button{border:0;background:transparent;color:var(--txt-dim);font-family:'Hanken Grotesk';font-weight:600;
+    font-size:12.5px;padding:6px 13px;border-radius:7px;cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--accent);color:#fff}
+
+  .plan{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow);
+    border-top:4px solid var(--c,var(--cheap))}
+  .pcard .ic{font-size:22px}
+  .pcard .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-faint);font-weight:600;margin-top:8px}
+  .pcard .when{font-family:'Bricolage Grotesque';font-weight:800;font-size:21px;margin-top:3px}
+  .pcard .meta{font-size:13px;color:var(--txt-dim);margin-top:5px}
+  .pcard .conf{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--c);
+    background:var(--c)1a;border-radius:999px;padding:3px 10px;margin-top:10px}
+
+  .risk-strip{display:flex;height:34px;border-radius:10px;overflow:hidden;margin-top:12px;border:1px solid var(--line-soft)}
+  .risk-strip .seg-h{flex:1;position:relative}
+  .risk-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--txt-faint);margin-top:6px;font-weight:600}
+
+  .grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;margin-top:14px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{display:flex;align-items:center;gap:7px;background:var(--card-2);border:1px solid var(--line);
+    border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--txt-dim)}
+  .chip b{color:var(--txt)}
+  .mae-box{position:relative;height:170px;margin-top:10px}
+  .note{font-size:12.5px;color:var(--txt-faint);margin-top:12px;line-height:1.5}
+  @media(max-width:760px){.plan,.grid2{grid-template-columns:1fr}.acc-badge{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="ttl"><h1>48-Hour Price Forecast</h1>
+      <p>Probabilistic forecast of ComEd real-time price · updated hourly</p></div>
+    <div class="acc-badge">
+      <div><div class="big">0.8¢</div><div class="lbl">Forecast MAE</div></div>
+      <div style="width:1px;height:34px;background:var(--line)"></div>
+      <div class="sub"><b style="color:var(--cheap)">31% closer</b> to actual than PJM day-ahead <span class="faint">(30-day backtest)</span></div>
+    </div>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  </div>
+
+  <!-- FORECAST CHART -->
+  <div class="card">
+    <div class="card-h">
+      <h3>Predicted price by hour <span class="faint" style="font-weight:500">(¢/kWh)</span></h3>
+      <div class="seg"><button class="on">Next 48h</button><button>Tomorrow</button><button>Next 6h</button></div>
+    </div>
+    <div class="legend">
+      <span><i style="border-color:var(--accent)"></i>Forecast (median)</span>
+      <span><span class="band"></span>Likely range (P10–P90)</span>
+      <span><i style="border-color:var(--txt-faint);border-top-style:dashed"></i>PJM day-ahead</span>
+      <span><i style="border-color:var(--spike);border-top-style:dotted"></i>Spike threshold</span>
+    </div>
+    <div class="chart-box"><canvas id="cFc"></canvas></div>
+  </div>
+
+  <!-- PLAN CARDS (forecast-driven) -->
+  <div class="plan">
+    <div class="pcard" style="--c:var(--cheap)">
+      <div class="ic">🟢</div>
+      <div class="k">Cheapest window · tomorrow</div>
+      <div class="when">1 AM – 4 AM</div>
+      <div class="meta">predicted ~1.0¢ · run dishwasher, laundry, EV charge</div>
+      <span class="conf">● 88% confidence</span>
+    </div>
+    <div class="pcard" style="--c:var(--neg)">
+      <div class="ic">🔋</div>
+      <div class="k">Best 6-hr EV charge block</div>
+      <div class="when">11 PM – 5 AM</div>
+      <div class="meta">avg ~1.3¢ · est. $0.42 to add 40 kWh</div>
+      <span class="conf">● 84% confidence</span>
+    </div>
+    <div class="pcard" style="--c:var(--spike)">
+      <div class="ic">⚠️</div>
+      <div class="k">Highest spike risk</div>
+      <div class="when">Tomorrow 4–7 PM</div>
+      <div class="meta">could exceed 12¢ · pre-cool home before 3 PM</div>
+      <span class="conf">● 41% chance &gt; 10¢</span>
+    </div>
+  </div>
+
+  <!-- SPIKE RISK TIMELINE -->
+  <div class="card">
+    <div class="card-h"><h3>Spike-risk timeline · next 48h</h3>
+      <span class="faint" style="font-weight:600">green = safe to use power · red = avoid</span></div>
+    <div class="risk-strip" id="riskStrip"></div>
+    <div class="risk-labels"><span>Now</span><span>+12h</span><span>+24h</span><span>+36h</span><span>+48h</span></div>
+  </div>
+
+  <!-- ACCURACY + HOW IT WORKS -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><h3>How accurate has it been?</h3>
+        <span class="faint" style="font-weight:600">mean abs. error · last 7 days</span></div>
+      <div class="mae-box"><canvas id="cMae"></canvas></div>
+      <p class="note">Lower is better. We score the forecast against the settled real-time price and
+        always show it next to PJM's day-ahead so you can judge the edge yourself.</p>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>What the forecast looks at</h3></div>
+      <div class="chips">
+        <span class="chip">📈 <b>PJM day-ahead LMP</b></span>
+        <span class="chip">⚡ <b>7-day load forecast</b></span>
+        <span class="chip">🌡️ <b>Chicago weather</b></span>
+        <span class="chip">🕒 <b>Recent 5-min prices</b></span>
+        <span class="chip">☀️ <b>Solar / wind forecast</b></span>
+        <span class="chip">📅 <b>Hour · day · holiday</b></span>
+      </div>
+      <p class="note" style="margin-top:16px">
+        The model learns the gap between day-ahead and what actually happens, then corrects for it —
+        so a hot-afternoon spike that day-ahead underprices still shows up here.
+        Bands widen when the grid is harder to predict (heat waves, tight reserves).</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+const tier=p=>p<0?css('--neg'):p<3?css('--cheap'):p<8?css('--moderate'):p<15?css('--high'):css('--spike');
+Chart.defaults.font.family="'Hanken Grotesk',sans-serif";
+Chart.defaults.color=()=>css('--txt-faint');
+
+// ---- mock 48h forecast ----
+const N=48, labels=[], p50=[], p10=[], p90=[], da=[];
+for(let h=0;h<N;h++){
+  const hod=(16+h)%24;                       // start ~4pm
+  let base;
+  if(hod>=16&&hod<=20) base=8+ (hod===17?9:hod===18?5:2);   // evening peak/spike
+  else if(hod>=0&&hod<=5) base=1.0+Math.random()*0.6;        // overnight cheap
+  else if(hod>=6&&hod<=9) base=3+Math.random()*2;            // morning ramp
+  else base=1.8+Math.random()*1.6;                            // daytime
+  base+= (h>24?0.6:0);                                        // day 2 slightly higher
+  const med=+base.toFixed(2);
+  const spread=med>7?med*0.45:med*0.22;                       // wider band at peaks
+  labels.push((hod%12||12)+(hod<12?'A':'P'));
+  p50.push(med);
+  p10.push(+Math.max(-1,med-spread).toFixed(2));
+  p90.push(+(med+spread).toFixed(2));
+  da.push(+(med*(med>7?0.62:1.05)+ (Math.random()-0.5)).toFixed(2)); // DA underprices spikes
+}
+
+const ctx=document.getElementById('cFc').getContext('2d');
+const grad=ctx.createLinearGradient(0,0,0,300);grad.addColorStop(0,css('--accent')+'44');grad.addColorStop(1,css('--accent')+'10');
+let fc=new Chart(ctx,{type:'line',
+  data:{labels,datasets:[
+    {label:'P10',data:p10,borderColor:'transparent',pointRadius:0,fill:false},
+    {label:'P90',data:p90,borderColor:'transparent',backgroundColor:grad,pointRadius:0,fill:'-1',tension:.35},
+    {label:'Forecast',data:p50,borderColor:css('--accent'),borderWidth:3,pointRadius:0,tension:.35,
+      segment:{borderColor:c=>tier(c.p1.parsed.y)}},
+    {label:'Day-ahead',data:da,borderColor:css('--txt-faint'),borderWidth:2,borderDash:[6,5],pointRadius:0,tension:.3},
+    {label:'Spike threshold',data:Array(N).fill(10),borderColor:css('--spike'),borderWidth:1.5,borderDash:[2,4],pointRadius:0}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false},tooltip:{filter:i=>i.dataset.label!=='P10',
+      callbacks:{label:i=>i.dataset.label+': '+i.parsed.y.toFixed(1)+'¢'}}},
+    scales:{x:{grid:{display:false},ticks:{color:css('--txt-faint'),font:{size:10},maxTicksLimit:12}},
+      y:{grid:{color:css('--line-soft')},border:{display:false},ticks:{color:css('--txt-faint'),callback:v=>v+'¢'}}}}});
+
+// risk strip
+const strip=document.getElementById('riskStrip');
+p50.forEach(v=>{const d=document.createElement('div');d.className='seg-h';d.style.background=tier(v);d.style.opacity=.85;
+  d.title=v.toFixed(1)+'¢';strip.appendChild(d);});
+
+// MAE comparison
+let mae=new Chart(document.getElementById('cMae'),{type:'bar',
+  data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[
+    {label:'Our forecast',data:[0.7,0.9,1.1,0.6,0.8,0.5,0.9],backgroundColor:css('--accent'),borderRadius:5,maxBarThickness:16},
+    {label:'PJM day-ahead',data:[1.3,1.8,2.4,1.0,1.6,0.9,1.4],backgroundColor:css('--txt-faint')+'88',borderRadius:5,maxBarThickness:16}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{usePointStyle:true,boxWidth:8,font:{size:11.5}}}},
+    scales:{x:{grid:{display:false}},y:{grid:{color:css('--line-soft')},border:{display:false},
+      ticks:{callback:v=>v+'¢'}}}}});
+
+document.getElementById('themeBtn').onclick=function(){
+  const l=document.body.getAttribute('data-theme')==='light';
+  document.body.setAttribute('data-theme',l?'':'light');this.textContent=l?'🌙':'☀️';
+  fc.destroy();mae.destroy();location.reload();
+};
+</script>
+</body>
+</html>

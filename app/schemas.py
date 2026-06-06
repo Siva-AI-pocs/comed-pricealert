@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import available_timezones
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -42,6 +43,7 @@ class SubscribeRequest(BaseModel):
     whatsapp_number: str | None = None
     threshold_cents: float = 0.0
     high_threshold_cents: float | None = None
+    notify_negative: bool = True
 
     @field_validator("whatsapp_number")
     @classmethod
@@ -75,6 +77,7 @@ class SubscriptionOut(BaseModel):
     whatsapp_number: str | None
     threshold_cents: float
     high_threshold_cents: float | None
+    notify_negative: bool = True
     active: bool
     created_at: datetime
     last_alerted_at: datetime | None
@@ -108,6 +111,38 @@ class ChangePasswordRequest(BaseModel):
     def password_min_length(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    password: str
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: str | None = None
+    timezone: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if len(v) > 100:
+            raise ValueError("Name must be at most 100 characters")
+        return v or None
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if v not in available_timezones():
+            raise ValueError("Unknown timezone")
         return v
 
 
@@ -185,10 +220,36 @@ class UsageInsightsOut(BaseModel):
     summary: UsageInsightsSummary
 
 
+class ForecastPoint(BaseModel):
+    target_ts: datetime
+    p10: float
+    p50: float
+    p90: float
+    spike_prob: float | None = None
+    da_lmp: float | None = None
+    model_version: str
+
+    model_config = {"from_attributes": True}
+
+
+class ForecastAccuracyDay(BaseModel):
+    day: str
+    model: float | None
+    da: float | None
+
+
+class ForecastAccuracy(BaseModel):
+    mae: float | None
+    vs_day_ahead_pct: float | None
+    daily: list[ForecastAccuracyDay]
+
+
 class UserOut(BaseModel):
     id: int
     email: str
     created_at: datetime
     comed_connected: bool = False
+    name: str | None = None
+    timezone: str | None = None
 
     model_config = {"from_attributes": True}

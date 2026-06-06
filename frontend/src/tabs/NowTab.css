@@ -1,0 +1,30 @@
+.now-h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 22px 0 6px;
+}
+.range-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 4px;
+}
+.range-btn {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 13px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.range-btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.now-error {
+  color: var(--spike);
+  font-size: 13px;
+}
