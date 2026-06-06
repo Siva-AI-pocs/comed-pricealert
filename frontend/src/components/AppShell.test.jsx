@@ -1,31 +1,32 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../test/utils.jsx";
 import AppShell from "./AppShell.jsx";
 
 const renderAt = (path = "/", opts = {}) =>
   renderWithProviders(<AppShell />, { route: path, ...opts });
 
+const DESTINATIONS = ["Now", "Forecast", "Usage & Savings", "Alerts"];
+
 afterEach(() => vi.restoreAllMocks());
 
 describe("AppShell navigation", () => {
-  it("desktop top nav lists all five tabs", async () => {
+  it("the desktop top menu lists every destination (no 'More')", async () => {
     renderAt("/");
     const primary = await screen.findByRole("navigation", { name: /primary/i });
-    for (const label of ["Now", "Forecast", "Usage & Savings", "Alerts", "More"]) {
+    for (const label of DESTINATIONS) {
       expect(within(primary).getByRole("link", { name: label })).toBeInTheDocument();
     }
+    expect(within(primary).queryByRole("link", { name: /more/i })).not.toBeInTheDocument();
   });
 
-  it("mobile bottom nav shows the four phone tabs (Usage folds under More)", async () => {
+  it("the hamburger button toggles the mobile side drawer", async () => {
     renderAt("/");
-    const bottom = await screen.findByRole("navigation", { name: /bottom/i });
-    for (const label of ["Now", "Forecast", "Alerts", "More"]) {
-      expect(within(bottom).getByRole("link", { name: label })).toBeInTheDocument();
-    }
-    expect(
-      within(bottom).queryByRole("link", { name: "Usage & Savings" }),
-    ).not.toBeInTheDocument();
+    const btn = await screen.findByRole("button", { name: /menu/i });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
   });
 
   it("renders the Now tab at / (public)", async () => {
@@ -54,14 +55,19 @@ describe("AppShell navigation", () => {
     expect(screen.queryByTestId("tab-usage")).not.toBeInTheDocument();
   });
 
-  it("renders the Privacy and Terms pages on their routes", async () => {
+  it("links to Privacy and Terms from the footer, and renders those pages", async () => {
+    renderAt("/");
+    const footer = document.querySelector(".pp-footer");
+    expect(within(footer).getByRole("link", { name: /privacy/i })).toBeInTheDocument();
+    expect(within(footer).getByRole("link", { name: /terms/i })).toBeInTheDocument();
+
     renderAt("/privacy");
     expect(await screen.findByTestId("page-privacy")).toBeInTheDocument();
     renderAt("/terms");
     expect(await screen.findByTestId("page-terms")).toBeInTheDocument();
   });
 
-  it("marks the active tab with aria-current", async () => {
+  it("marks the active destination with aria-current", async () => {
     renderAt("/forecast");
     const primary = await screen.findByRole("navigation", { name: /primary/i });
     expect(within(primary).getByRole("link", { name: "Forecast" })).toHaveAttribute(

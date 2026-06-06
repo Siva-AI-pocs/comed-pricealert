@@ -2,17 +2,15 @@ import { useEffect, useState } from "react";
 import { pricesApi } from "../api/prices.js";
 import { decisionApi } from "../api/decision.js";
 import PriceHero from "../components/PriceHero.jsx";
-import DecisionBanner from "../components/DecisionBanner.jsx";
-import StatsBar from "../components/StatsBar.jsx";
+import WhenToUsePower from "../components/WhenToUsePower.jsx";
 import PriceChart5min from "../components/PriceChart5min.jsx";
 import PriceChartHourly from "../components/PriceChartHourly.jsx";
 import DailySummaryTable from "../components/DailySummaryTable.jsx";
-import "./NowTab.css";
 
 const RANGES = [
   { key: "today", label: "Today", params: { today: true } },
-  { key: "24h", label: "24 hours", params: { days: 1 } },
-  { key: "7d", label: "7 days", params: { days: 7 } },
+  { key: "24h", label: "24h", params: { days: 1 } },
+  { key: "7d", label: "7d", params: { days: 7 } },
 ];
 
 export default function NowTab() {
@@ -38,7 +36,7 @@ export default function NowTab() {
         const d = await decisionApi.get();
         if (alive) setDecision(d);
       } catch {
-        // 503 when no price data yet — leave the banner hidden
+        // 503 when no price data yet — leave the badge on the tier label
       }
       try {
         const ds = await pricesApi.dailySummary();
@@ -77,39 +75,58 @@ export default function NowTab() {
   }, [range]);
 
   return (
-    <section data-testid="tab-now" className="now-tab">
-      <PriceHero stats={stats} />
-      <DecisionBanner decision={decision} />
-      <StatsBar stats={stats} />
-
-      <div className="range-tabs" role="group" aria-label="Chart range">
-        {RANGES.map((r) => (
-          <button
-            key={r.key}
-            type="button"
-            className={`range-btn${range === r.key ? " on" : ""}`}
-            aria-pressed={range === r.key}
-            onClick={() => setRange(r.key)}
-          >
-            {r.label}
-          </button>
-        ))}
+    <section data-testid="tab-now">
+      <div className="hero">
+        <PriceHero stats={stats} decision={decision} />
+        <WhenToUsePower hourly={hourly} />
       </div>
 
-      {historyError && (
-        <p className="now-error" role="alert">
-          {historyError}
-        </p>
-      )}
+      <div className="card">
+        <div className="card-h">
+          <h3>
+            Price by hour{" "}
+            <span className="faint" style={{ fontWeight: 500 }}>
+              (¢/kWh)
+            </span>
+          </h3>
+          <div className="seg" role="group" aria-label="Chart range">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                className={range === r.key ? "on" : ""}
+                aria-pressed={range === r.key}
+                onClick={() => setRange(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {historyError && (
+          <p role="alert" style={{ color: "var(--spike)", fontSize: 14 }}>
+            {historyError}
+          </p>
+        )}
+        <PriceChartHourly rows={hourly} />
+      </div>
 
-      <h3 className="now-h3">5-minute prices</h3>
-      <PriceChart5min rows={fiveMin} />
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="card-h">
+          <h3>Live 5-minute price</h3>
+          <span className="faint" style={{ fontWeight: 600 }}>
+            drag to zoom
+          </span>
+        </div>
+        <PriceChart5min rows={fiveMin} />
+      </div>
 
-      <h3 className="now-h3">Hourly averages</h3>
-      <PriceChartHourly rows={hourly} />
-
-      <h3 className="now-h3">Last 7 days</h3>
-      <DailySummaryTable rows={daily} />
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="card-h">
+          <h3>7-day daily summary</h3>
+        </div>
+        <DailySummaryTable rows={daily} />
+      </div>
     </section>
   );
 }

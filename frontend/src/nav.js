@@ -1,14 +1,12 @@
 /**
- * Primary navigation tabs. Desktop shows all five as top tabs; the mobile
- * bottom bar shows only the four `mobile` tabs (Usage & Savings folds under
- * More on phones), per design mockups 01 (desktop) and 03 (mobile).
+ * Primary navigation menu. Desktop renders these as top tabs (like the mockup);
+ * mobile renders them inside the hamburger side drawer. Privacy/Terms live in
+ * the page footer, not here. History (daily summary + trend) lives inside Now;
+ * My Data (Green Button upload + meters) lives inside Usage & Savings.
  */
-export const TABS = [
-  { key: "now", to: "/", label: "Now", icon: "⚡", end: true, mobile: true },
-  { key: "forecast", to: "/forecast", label: "Forecast", icon: "📈", mobile: true },
-  { key: "usage", to: "/usage", label: "Usage & Savings", icon: "📊", mobile: false },
-  { key: "alerts", to: "/alerts", label: "Alerts", icon: "🔔", mobile: true },
-  { key: "more", to: "/more", label: "More", icon: "☰", mobile: true },
+export const MENU = [
+  { key: "now", to: "/", label: "Now", icon: "⚡", end: true },
+  { key: "forecast", to: "/forecast", label: "Forecast", icon: "📈" },
+  { key: "usage", to: "/usage", label: "Usage & Savings", icon: "📊" },
+  { key: "alerts", to: "/alerts", label: "Alerts", icon: "🔔" },
 ];
-
-export const MOBILE_TABS = TABS.filter((t) => t.mobile);

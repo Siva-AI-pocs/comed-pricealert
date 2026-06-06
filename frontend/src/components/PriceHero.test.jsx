@@ -13,7 +13,8 @@ describe("PriceHero", () => {
   it("shows the delta vs the 7-day average", () => {
     render(<PriceHero stats={{ current_price: 2, week_avg: 4 }} />);
     expect(screen.getByText(/50%/)).toBeInTheDocument();
-    expect(screen.getByText(/7-day avg/i)).toBeInTheDocument();
+    // "7-Day Avg" is also a mini-stat label now, so target the delta sub-line.
+    expect(screen.getByText(/vs 7-day avg/i)).toBeInTheDocument();
   });
 
   it("classifies a spike correctly", () => {

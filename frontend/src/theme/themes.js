@@ -41,7 +41,9 @@ export const THEMES = {
     dark: {
       "--bg": "#0a0f1c",
       "--card": "#121a2e",
+      "--card-2": "#18223b",
       "--line": "#20294150",
+      "--line-soft": "#1b244033",
       "--txt": "#eaf0ff",
       "--dim": "#93a4c7",
       "--faint": "#5a6b91",
@@ -57,7 +59,9 @@ export const THEMES = {
     light: {
       "--bg": "#f1f5fc",
       "--card": "#ffffff",
+      "--card-2": "#f5f8fd",
       "--line": "#e4e9f5",
+      "--line-soft": "#eef2fa",
       "--txt": "#0c1426",
       "--dim": "#51607e",
       "--faint": "#95a1bd",
@@ -77,7 +81,9 @@ export const THEMES = {
     dark: {
       "--bg": "#08110f",
       "--card": "#0f1c1a",
+      "--card-2": "#142623",
       "--line": "#1c2e2b60",
+      "--line-soft": "#16302c33",
       "--txt": "#e9f5f1",
       "--dim": "#8fb0a8",
       "--faint": "#54716b",
@@ -93,7 +99,9 @@ export const THEMES = {
     light: {
       "--bg": "#eef5f3",
       "--card": "#ffffff",
+      "--card-2": "#f3faf8",
       "--line": "#dfeae7",
+      "--line-soft": "#e8f1ee",
       "--txt": "#07140f",
       "--dim": "#4a655d",
       "--faint": "#8aa39b",
@@ -113,7 +121,9 @@ export const THEMES = {
     dark: {
       "--bg": "#0c0d08",
       "--card": "#15170f",
+      "--card-2": "#1d2014",
       "--line": "#262a1a70",
+      "--line-soft": "#23261633",
       "--txt": "#f3f6e9",
       "--dim": "#aeb59a",
       "--faint": "#6b7258",
@@ -129,7 +139,9 @@ export const THEMES = {
     light: {
       "--bg": "#f6f7ee",
       "--card": "#ffffff",
+      "--card-2": "#f8f9ef",
       "--line": "#e9ebda",
+      "--line-soft": "#eef0df",
       "--txt": "#14150c",
       "--dim": "#5f6347",
       "--faint": "#9aa07f",

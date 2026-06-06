@@ -1,21 +1,57 @@
 .theme-picker {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  position: relative;
+  display: inline-flex;
 }
+
+/* trigger reuses .pp-iconbtn; .tp-trigger reflects the open state */
+.tp-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* popover panel anchored under the icon */
+.tp-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 60;
+  min-width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.tp-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 700;
+  padding: 2px 2px 4px;
+}
+.tp-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line-soft);
+}
+
 .tp-brand {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
+  width: 100%;
   border: 1.5px solid var(--line);
   background: transparent;
   color: var(--txt);
   font-family: inherit;
   font-weight: 700;
-  font-size: 13px;
-  padding: 7px 11px;
-  border-radius: 10px;
+  font-size: 13.5px;
+  padding: 9px 11px;
+  border-radius: 11px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -36,13 +72,23 @@
   border-radius: 3px;
   display: block;
 }
+
 .tp-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
   border: 1px solid var(--line);
-  background: var(--card);
+  background: var(--card-2);
   color: var(--txt);
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 9px 11px;
+  border-radius: 11px;
   cursor: pointer;
-  font-size: 15px;
+  transition: border-color 0.15s;
+}
+.tp-mode:hover {
+  border-color: var(--accent);
 }
