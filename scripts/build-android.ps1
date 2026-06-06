@@ -49,15 +49,23 @@ Write-Host "==> Building the web app (Capacitor webDir source)..."
 npm --prefix $frontend run build
 if ($LASTEXITCODE -ne 0) { throw "Web build failed." }
 
-Write-Host "==> Ensuring the Android platform exists..."
-if (-not (Test-Path (Join-Path $frontend "android"))) {
-  npm --prefix $frontend exec --yes -- cap add android
-  if ($LASTEXITCODE -ne 0) { throw "cap add android failed." }
-}
+# The Capacitor CLI must run from the frontend dir (where package.json +
+# capacitor.config.json live); `npm --prefix ... exec` does NOT change cwd.
+Push-Location $frontend
+try {
+  Write-Host "==> Ensuring the Android platform exists..."
+  if (-not (Test-Path (Join-Path $frontend "android"))) {
+    npx --no-install cap add android
+    if ($LASTEXITCODE -ne 0) { throw "cap add android failed." }
+  }
 
-Write-Host "==> Syncing Capacitor..."
-npm --prefix $frontend exec -- cap sync android
-if ($LASTEXITCODE -ne 0) { throw "cap sync android failed." }
+  Write-Host "==> Syncing Capacitor..."
+  npx --no-install cap sync android
+  if ($LASTEXITCODE -ne 0) { throw "cap sync android failed." }
+}
+finally {
+  Pop-Location
+}
 
 Write-Host "==> Building the debug APK with Gradle..."
 $android = Join-Path $frontend "android"
