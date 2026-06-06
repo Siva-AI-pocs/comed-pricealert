@@ -1,4 +1,4 @@
-import { detectPlatform } from "../platform.js";
+import { detectPlatform, isNativeApp } from "../platform.js";
 import { ANDROID_APK_URL, APP_STORE_URL } from "../config/appLinks.js";
 import "./GetTheApp.css";
 
@@ -31,6 +31,8 @@ function IosLink() {
 }
 
 export default function GetTheApp() {
+  // Already in the native app — no point offering an app download.
+  if (isNativeApp()) return null;
   const platform = detectPlatform();
   return (
     <div className="get-app" aria-label="Get the mobile app">
