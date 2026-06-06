@@ -51,6 +51,22 @@ describe("hourlyChartData", () => {
     expect(out.data).toEqual([2, 16]);
     expect(out.colors).toEqual(["#cheap", "#spike"]);
   });
+
+  it("fills missing hours with null slots so every hour shows on the axis", () => {
+    const rows = [
+      { hour_utc: "2026-06-04T00:00:00", avg_price_cents: 2 },
+      { hour_utc: "2026-06-04T03:00:00", avg_price_cents: 16 },
+    ];
+    const out = hourlyChartData(rows, readVar);
+    // 00:00, 01:00 (gap), 02:00 (gap), 03:00 → 4 continuous slots
+    expect(out.labels).toHaveLength(4);
+    expect(out.data).toEqual([2, null, null, 16]);
+    expect(out.colors).toEqual(["#cheap", "transparent", "transparent", "#spike"]);
+  });
+
+  it("returns empty series for no rows", () => {
+    expect(hourlyChartData([], readVar)).toEqual({ labels: [], data: [], colors: [] });
+  });
 });
 
 describe("usageVsPriceData", () => {
