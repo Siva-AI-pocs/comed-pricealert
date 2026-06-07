@@ -40,6 +40,23 @@ def _get_or_create_meter(db: Session, user_id: int, usage_point_id: str) -> Usag
     return meter
 
 
+def _clear_meter_range(
+    db: Session, meter_id: int, start_utc: datetime, end_utc: datetime
+) -> int:
+    """Delete a meter's intervals within [start_utc, end_utc] so re-uploading the
+    same period replaces it (latest-wins) instead of leaving stale rows that would
+    double-count when interval boundaries differ between uploads."""
+    return (
+        db.query(UsageInterval)
+        .filter(
+            UsageInterval.meter_id == meter_id,
+            UsageInterval.start_utc >= start_utc,
+            UsageInterval.start_utc <= end_utc,
+        )
+        .delete(synchronize_session=False)
+    )
+
+
 def ingest_intervals(db: Session, user_id: int, source: str, tuples: Iterable[IntervalTuple]) -> IngestResult:
     by_point: dict[str, list[IntervalTuple]] = {}
     for t in tuples:
@@ -53,6 +70,11 @@ def ingest_intervals(db: Session, user_id: int, source: str, tuples: Iterable[In
     for usage_point_id, items in by_point.items():
         meter = _get_or_create_meter(db, user_id, usage_point_id)
         meter_ids.append(meter.id)
+
+        starts = [t.start_utc for t in items]
+        s_min, s_max = min(starts), max(starts)
+        # Latest-wins: drop any existing intervals in this upload's range first.
+        _clear_meter_range(db, meter.id, s_min, s_max)
 
         rows = [
             {
@@ -79,8 +101,6 @@ def ingest_intervals(db: Session, user_id: int, source: str, tuples: Iterable[In
         result = db.execute(stmt)
         total_inserted += result.rowcount or 0
 
-        starts = [t.start_utc for t in items]
-        s_min, s_max = min(starts), max(starts)
         overall_start = s_min if overall_start is None or s_min < overall_start else overall_start
         overall_end = s_max if overall_end is None or s_max > overall_end else overall_end
 
