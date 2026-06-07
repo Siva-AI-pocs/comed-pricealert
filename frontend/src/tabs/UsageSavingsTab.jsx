@@ -105,7 +105,10 @@ export default function UsageSavingsTab() {
               </div>
             </div>
             {insights?.hourly?.length ? (
-              <UsageVsPriceChart hourly={insights.hourly} />
+              <UsageVsPriceChart
+                hourly={insights.hourly}
+                granularity={range === "24h" ? "hour" : "day"}
+              />
             ) : (
               <p className="faint">No overlapping usage and price data for this range.</p>
             )}
