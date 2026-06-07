@@ -1,0 +1,19 @@
+.git
+.gitignore
+**/node_modules
+frontend/dist
+# Built in-image by the frontend stage; never copy a host build.
+app/static_spa
+venv
+.venv
+data
+*.db
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+tests
+docs
+.github
+.claude
+*.md
