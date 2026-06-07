@@ -132,14 +132,14 @@ def _send_email(
     dashboard_url: str,
     direction: str = "low",
 ) -> tuple[bool, str]:
-    subject = f"ComEd Price Alert: {price:.2f}¢/kWh"
+    subject = f"VoltMint: {price:.2f}¢/kWh"
     plain = _build_message(price, threshold, dashboard_url, direction)
     threshold_label = (
         f"≥{threshold:.2f}¢/kWh" if direction == "high" else f"≤{threshold:.2f}¢/kWh"
     )
     html = f"""
     <html><body>
-    <h2 style="color:{"green" if price <= 0 else "orange"}">ComEd Price Alert!</h2>
+    <h2 style="color:{"green" if price <= 0 else "orange"}">VoltMint!</h2>
     <table style="font-size:16px;border-collapse:collapse">
       <tr><td style="padding:6px 12px"><b>Current price</b></td><td style="padding:6px 12px;color:{"green" if price <= 0 else "red"}">{price:.2f}¢/kWh</td></tr>
       <tr><td style="padding:6px 12px"><b>Your threshold</b></td><td style="padding:6px 12px">{threshold_label}</td></tr>
@@ -154,15 +154,15 @@ def _send_email(
 def send_password_reset_email(to_address: str, code: str) -> tuple[bool, str]:
     """Email a password-reset code. Returns (success, error_message)."""
     minutes = settings.reset_code_expire_minutes
-    subject = "Your ComEd Price Alert password reset code"
+    subject = "Your VoltMint password reset code"
     plain = (
-        f"Your ComEd Price Alert password reset code is: {code}\n\n"
+        f"Your VoltMint password reset code is: {code}\n\n"
         f"It is valid for {minutes} minutes. If you didn't request this, you can ignore this email.\n"
     )
     html = f"""
     <html><body>
     <h2>Password reset</h2>
-    <p>Your ComEd Price Alert password reset code is:</p>
+    <p>Your VoltMint password reset code is:</p>
     <p style="font-size:28px;font-weight:bold;letter-spacing:4px">{code}</p>
     <p>It is valid for {minutes} minutes. If you didn't request this, you can ignore this email.</p>
     </body></html>
@@ -324,7 +324,7 @@ async def check_and_notify(db: Session, current_price: float) -> None:
 
 async def send_confirmation(sub: Subscription) -> None:
     message = (
-        f"You are now subscribed to ComEd Price Alerts!\n\n"
+        f"You are now subscribed to VoltMint alerts!\n\n"
         f"You will be notified when the price drops to {sub.threshold_cents:.2f}¢/kWh or below.\n"
         f"To unsubscribe, visit the dashboard and click Unsubscribe."
     )

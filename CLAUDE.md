@@ -1,4 +1,4 @@
-# ComEd Price Alert — agent guide
+# VoltMint — agent guide
 
 FastAPI app that polls ComEd real-time electricity prices, stores history, and
 alerts users (Email / Telegram / WhatsApp) when prices cross their threshold.
@@ -95,8 +95,17 @@ Render. To ship: `git pull` then `docker compose up -d --build` in this director
   real secrets come from `.env` (not committed).
 - `.dockerignore` keeps the build context lean (excludes `node_modules`, the host `static_spa`,
   `tests`, `docs`, etc.).
-- The prebuilt Android **APK** (`app/static/downloads/pricepulse.apk`) ships in the image via
-  `COPY app ./app` and is served at `/static/downloads/pricepulse.apk` (the SPA "Get the app" link).
+- The prebuilt Android **APK** (`app/static/downloads/voltmint.apk`) ships in the image via
+  `COPY app ./app` and is served at `/static/downloads/voltmint.apk` (the SPA "Get the app" link).
+- **Releasing the mobile app.** The APK is a Capacitor wrapper around the live
+  site, so web changes reach users without a rebuild. To cut a versioned release
+  (fresh APK + bumped version shown on the download link), run on a machine with
+  the Android SDK: `powershell -ExecutionPolicy Bypass -File scripts/release-app.ps1`
+  (add `-Bump minor`/`-Bump major` for bigger releases). It bumps
+  `frontend/package.json`, builds a version-stamped APK, and writes
+  `app/static/downloads/app-version.json` (the manifest `GetTheApp` reads). Commit
+  the three changed files. This is a deliberate local step — the APK cannot be
+  built in CI (no Android SDK), so there is no hook/Action for it.
 - **Verify a deploy** at both `http://localhost:8005` and `https://pricealert.s2rdlabs.com/`:
   `/` (SPA shell), a client route like `/forecast` (SPA fallback), `/health`, `/api/forecast`,
   the APK, and `/privacy` (real static legal page — kept static for ComEd Green Button compliance).

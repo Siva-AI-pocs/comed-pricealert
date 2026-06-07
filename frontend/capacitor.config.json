@@ -1,9 +1,9 @@
 {
-  "appId": "com.s2rdlabs.pricepulse",
-  "appName": "ComEd Price Pulse",
+  "appId": "com.s2rdlabs.voltmint",
+  "appName": "VoltMint",
   "webDir": "../app/static_spa",
   "server": {
-    "url": "https://pricealert.s2rdlabs.com/app",
+    "url": "https://voltmint.s2rdlabs.com",
     "cleartext": false
   }
 }

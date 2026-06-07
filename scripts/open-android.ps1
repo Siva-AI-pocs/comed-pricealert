@@ -17,7 +17,7 @@
      phone's localhost reaches this PC. The committed capacitor.config.json is
      NOT changed permanently - the local URL is baked only into the (git-ignored)
      android/ project for this session, then the source config is restored.
-  -Server prod : use the committed config (wraps https://pricealert.s2rdlabs.com/app).
+  -Server prod : use the committed config (wraps https://voltmint.s2rdlabs.com).
 
   In Android Studio: wait for the Gradle sync, pick your device in the toolbar,
   and click Run (>) to build + install + launch; or
@@ -91,8 +91,8 @@ if ($Server -eq "local") {
   $origConfig = [System.IO.File]::ReadAllText($config)
   $localConfig = @"
 {
-  "appId": "com.s2rdlabs.pricepulse",
-  "appName": "ComEd Price Pulse",
+  "appId": "com.s2rdlabs.voltmint",
+  "appName": "VoltMint",
   "webDir": "../app/static_spa",
   "server": {
     "url": "$localUrl",

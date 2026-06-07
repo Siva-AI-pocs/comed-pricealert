@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="ComEd Price Alert", lifespan=lifespan)
+app = FastAPI(title="VoltMint", lifespan=lifespan)
 
 # Sliding-session refresh: re-issue the auth cookie for active users.
 from app.auth.session import add_sliding_session_refresh  # noqa: E402
@@ -77,15 +77,15 @@ def health():
 # ZIP archives, so when served as the StaticFiles default (text/plain) a browser
 # or a content-sniffing CDN saves them as ".zip". Registered BEFORE the /static
 # mount so this explicit route wins for that path.
-@app.api_route("/static/downloads/pricepulse.apk", methods=["GET", "HEAD"])
+@app.api_route("/static/downloads/voltmint.apk", methods=["GET", "HEAD"])
 def download_android_apk():
-    apk = STATIC_DIR / "downloads" / "pricepulse.apk"
+    apk = STATIC_DIR / "downloads" / "voltmint.apk"
     if not apk.is_file():
         raise HTTPException(status_code=404, detail="APK not available")
     return FileResponse(
         apk,
         media_type="application/vnd.android.package-archive",
-        filename="pricepulse.apk",
+        filename="voltmint.apk",
     )
 
 

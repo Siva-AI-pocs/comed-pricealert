@@ -47,7 +47,7 @@ export default function AppShell() {
             ⚡
           </span>
           <span className="pp-brand-text">
-            <b>ComEd Price Pulse</b>
+            <b>VoltMint</b>
             <span>Hourly pricing, made actionable</span>
           </span>
         </div>
@@ -94,7 +94,7 @@ export default function AppShell() {
           <span className="pp-mark" aria-hidden="true">
             ⚡
           </span>
-          <b className="pp-drawer-title">Price Pulse</b>
+          <b className="pp-drawer-title">VoltMint</b>
           <button
             type="button"
             className="pp-drawer-close"
@@ -159,7 +159,7 @@ export default function AppShell() {
           <a href="/privacy">Privacy</a>
           <span aria-hidden="true">·</span>
           <a href="/terms">Terms</a>
-          <span className="pp-footer-copy">ComEd Price Pulse</span>
+          <span className="pp-footer-copy">VoltMint</span>
           <GetTheApp />
         </footer>
       </main>

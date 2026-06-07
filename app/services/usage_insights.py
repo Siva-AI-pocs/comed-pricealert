@@ -41,6 +41,7 @@ def compute_insights(
     start: int | None = None,
     end: int | None = None,
     shiftable_pct: float | None = None,
+    flat_rate_cents: float | None = None,
 ) -> dict:
     """Return aligned hourly (usage, price, cost) plus a savings/cost summary.
 
@@ -52,6 +53,10 @@ def compute_insights(
     if shiftable_pct is None:
         shiftable_pct = settings.default_shiftable_pct
     shiftable_pct = max(0.0, min(1.0, float(shiftable_pct)))
+
+    if flat_rate_cents is None:
+        flat_rate_cents = settings.flat_rate_cents
+    flat_rate_cents = max(0.0, float(flat_rate_cents))
 
     if start is not None:
         window_start = datetime.fromtimestamp(start / 1000, tz=timezone.utc).replace(
@@ -87,13 +92,37 @@ def compute_insights(
     # Hourly price (cents/kWh) over the same window.
     price_by_hour = {_hour_key(h): p for h, p in price_q.all()}
 
-    # Aligned series — hours present in both usage and price.
+    # Recent-price profile, for usage hours we have no exact price for (e.g. an
+    # older uploaded month). Bucket the last 35 days of hourly prices by
+    # (is_weekend, hour-of-day) in Central Time and average.
+    profile_start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=35)
+    profile_sum: dict[tuple[bool, int], float] = defaultdict(float)
+    profile_cnt: dict[tuple[bool, int], int] = defaultdict(int)
+    for h, p in (
+        db.query(HourlyAverage.hour_utc, HourlyAverage.avg_price_cents)
+        .filter(HourlyAverage.hour_utc >= profile_start)
+        .all()
+    ):
+        ct = _hour_key(h).replace(tzinfo=timezone.utc).astimezone(COMED_TZ)
+        profile_sum[(ct.weekday() >= 5, ct.hour)] += p
+        profile_cnt[(ct.weekday() >= 5, ct.hour)] += 1
+
+    def _profile_price(hour: datetime) -> float | None:
+        ct = hour.replace(tzinfo=timezone.utc).astimezone(COMED_TZ)
+        key = (ct.weekday() >= 5, ct.hour)
+        n = profile_cnt.get(key, 0)
+        return profile_sum[key] / n if n else None
+
     hourly: list[dict] = []
     for hour in sorted(usage_by_hour):
-        if hour not in price_by_hour:
-            continue
+        estimated = False
+        price = price_by_hour.get(hour)
+        if price is None:
+            price = _profile_price(hour)
+            if price is None:
+                continue  # no exact and no recent profile → can't price this hour
+            estimated = True
         kwh = usage_by_hour[hour]
-        price = price_by_hour[hour]
         hourly.append(
             {
                 "hour_utc": hour,
@@ -101,6 +130,7 @@ def compute_insights(
                 "price_cents": round(price, 4),
                 "cost_cents": round(kwh * price, 4),
                 "level": _classify(price)["level"],
+                "price_estimated": estimated,
             }
         )
 
@@ -108,7 +138,7 @@ def compute_insights(
     actual_cost = sum(h["cost_cents"] for h in hourly)
 
     # Flat-rate bill comparison.
-    flat_cost = total_kwh * settings.flat_rate_cents
+    flat_cost = total_kwh * flat_rate_cents
     hourly_vs_flat = flat_cost - actual_cost
 
     # Smart-shift savings, grouped by Central-Time day (matches how ComEd bills).
@@ -145,7 +175,7 @@ def compute_insights(
             "total_kwh": round(total_kwh, 3),
             "actual_cost_cents": round(actual_cost, 2),
             "flat_cost_cents": round(flat_cost, 2),
-            "flat_rate_cents": settings.flat_rate_cents,
+            "flat_rate_cents": round(flat_rate_cents, 4),
             "hourly_vs_flat_cents": round(hourly_vs_flat, 2),
             "shiftable_pct": round(shiftable_pct, 2),
             "shiftable_kwh": round(shiftable_kwh_total, 3),

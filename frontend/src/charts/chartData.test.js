@@ -3,7 +3,7 @@ import {
   tierColor,
   fiveMinChartData,
   hourlyChartData,
-  usageVsPriceData,
+  usageVsPriceSeries,
 } from "./chartData.js";
 
 // Fake CSS-var resolver mapping each tier token to a sentinel color.
@@ -69,15 +69,37 @@ describe("hourlyChartData", () => {
   });
 });
 
-describe("usageVsPriceData", () => {
-  it("splits insight rows into usage + price series with price tier colors", () => {
-    const hourly = [
-      { hour_utc: "2026-06-04T00:00:00", kwh: 0.4, price_cents: 2 },
-      { hour_utc: "2026-06-04T01:00:00", kwh: 1.2, price_cents: 12 },
-    ];
-    const out = usageVsPriceData(hourly, readVar);
-    expect(out.usage).toEqual([0.4, 1.2]);
-    expect(out.price).toEqual([2, 12]);
-    expect(out.priceColors).toEqual(["#cheap", "#high"]);
+describe("usageVsPriceSeries", () => {
+  // 2026-06-04T06:00Z = 1 AM Central (same Central day as 2026-06-04T18:00Z = 1 PM).
+  const hourly = [
+    { hour_utc: "2026-06-04T06:00:00", kwh: 0.4, price_cents: 2 },
+    { hour_utc: "2026-06-04T18:00:00", kwh: 1.2, price_cents: 12 },
+    { hour_utc: "2026-06-05T18:00:00", kwh: 2.0, price_cents: 6 },
+  ];
+
+  it("at hourly granularity keeps one point per row with tier colors", () => {
+    const out = usageVsPriceSeries(hourly, "hour", readVar);
+    expect(out.usage).toEqual([0.4, 1.2, 2.0]);
+    expect(out.price).toEqual([2, 12, 6]);
+    expect(out.priceColors).toEqual(["#cheap", "#high", "#moderate"]);
+    expect(out.labels).toHaveLength(3);
+  });
+
+  it("at daily granularity sums kWh and means price per Central-Time day", () => {
+    const out = usageVsPriceSeries(hourly, "day", readVar);
+    // Two rows on Jun 4 (sum 1.6 kWh, mean price 7), one on Jun 5.
+    expect(out.usage).toEqual([1.6, 2.0]);
+    expect(out.price).toEqual([7, 6]);
+    expect(out.priceColors).toEqual(["#moderate", "#moderate"]);
+    expect(out.labels).toEqual(["Jun 4", "Jun 5"]);
+  });
+
+  it("returns empty series for no rows", () => {
+    expect(usageVsPriceSeries([], "day", readVar)).toEqual({
+      labels: [],
+      usage: [],
+      price: [],
+      priceColors: [],
+    });
   });
 });

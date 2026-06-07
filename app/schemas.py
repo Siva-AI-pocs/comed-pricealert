@@ -190,6 +190,8 @@ class UsageMeterOut(BaseModel):
     label: str | None
     created_at: datetime
     interval_count: int
+    interval_start_utc: datetime | None = None
+    interval_end_utc: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -200,6 +202,7 @@ class UsageInsightHour(BaseModel):
     price_cents: float
     cost_cents: float
     level: str
+    price_estimated: bool = False
 
 
 class UsageInsightsSummary(BaseModel):

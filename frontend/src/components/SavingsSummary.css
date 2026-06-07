@@ -1,0 +1,36 @@
+.save-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.save {
+  background: var(--card-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  padding: 15px;
+}
+.save .k {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 600;
+}
+.save .v {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 800;
+  font-size: 27px;
+  margin-top: 5px;
+}
+.save.good {
+  border-color: color-mix(in srgb, var(--cheap) 45%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cheap) 12%, transparent), transparent);
+}
+.save.good .v {
+  color: var(--cheap);
+}
+@media (max-width: 720px) {
+  .save-grid {
+    grid-template-columns: 1fr;
+  }
+}
