@@ -61,7 +61,7 @@ export default function GetTheApp() {
   const [seen, setSeen] = useState(readSeen);
 
   useEffect(() => {
-    if (isNativeApp()) return;
+    if (isNativeApp() || detectPlatform() === "ios") return;
     let alive = true;
     // Promise.resolve wrapper turns a synchronous fetch failure (e.g. fetch
     // undefined in an odd environment) into a caught rejection.

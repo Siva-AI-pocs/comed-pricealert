@@ -79,6 +79,14 @@ describe("GetTheApp", () => {
     expect(await screen.findByText("New")).toBeInTheDocument();
   });
 
+  it("shows the 'New' badge to a first-time visitor (no stored version)", async () => {
+    await renderWith("android", {
+      manifest: { version: "0.2.0", released: "2026-06-07", file: "/static/downloads/voltmint.apk" },
+      seen: null,
+    });
+    expect(await screen.findByText("New")).toBeInTheDocument();
+  });
+
   it("hides the 'New' badge when the last seen version equals the release", async () => {
     await renderWith("android", {
       manifest: { version: "0.2.0", released: "2026-06-07", file: "/static/downloads/voltmint.apk" },
@@ -96,6 +104,7 @@ describe("GetTheApp", () => {
     const link = await screen.findByRole("link", { name: /download android app/i });
     fireEvent.click(link);
     expect(localStorage.getItem(SEEN_KEY)).toBe("0.2.0");
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
   });
 
   it("renders the plain button (no version, no badge) when the manifest fetch fails", async () => {
