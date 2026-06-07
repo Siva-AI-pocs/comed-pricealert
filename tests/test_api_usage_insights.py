@@ -198,3 +198,9 @@ class TestCustomFlatRate:
         assert s["flat_rate_cents"] == pytest.approx(10.0)
         assert s["flat_cost_cents"] == pytest.approx(40.0)        # 4 kWh * 10¢
         assert s["hourly_vs_flat_cents"] == pytest.approx(8.0)     # 40 - 32
+
+    def test_flat_rate_out_of_range_rejected(self, client, db):
+        _register(client)
+        _seed_usage_and_price(db)
+        assert client.get("/api/usage/insights?flat_rate_cents=0").status_code == 422
+        assert client.get("/api/usage/insights?flat_rate_cents=500").status_code == 422
