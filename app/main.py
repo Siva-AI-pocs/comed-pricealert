@@ -3,7 +3,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -71,6 +71,22 @@ app.include_router(forecast.router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Serve the Android APK with the correct MIME type + download filename. APKs are
+# ZIP archives, so when served as the StaticFiles default (text/plain) a browser
+# or a content-sniffing CDN saves them as ".zip". Registered BEFORE the /static
+# mount so this explicit route wins for that path.
+@app.api_route("/static/downloads/pricepulse.apk", methods=["GET", "HEAD"])
+def download_android_apk():
+    apk = STATIC_DIR / "downloads" / "pricepulse.apk"
+    if not apk.is_file():
+        raise HTTPException(status_code=404, detail="APK not available")
+    return FileResponse(
+        apk,
+        media_type="application/vnd.android.package-archive",
+        filename="pricepulse.apk",
+    )
 
 
 # Serve static dashboard
