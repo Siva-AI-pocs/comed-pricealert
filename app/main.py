@@ -4,7 +4,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
@@ -20,8 +25,8 @@ logging.basicConfig(
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
-# Built React SPA (Vite -> app/static_spa, base "/app/"). Served at /app for
-# staging validation before the cutover that flips "/" to it.
+# Built React SPA (Vite -> app/static_spa, base "/" after cutover). Served at the
+# site root; falls back to the legacy static dashboard when not built (dev/CI).
 STATIC_SPA = Path(__file__).parent / "static_spa"
 
 
@@ -91,11 +96,21 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def _render_with_version(filename: str) -> HTMLResponse:
     html = (STATIC_DIR / filename).read_text(encoding="utf-8")
     html = html.replace("{{STATIC_VERSION}}", STATIC_VERSION)
-    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return HTMLResponse(
+        content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
+
+
+def _spa_built() -> bool:
+    return (STATIC_SPA / "index.html").is_file()
 
 
 @app.get("/")
 def index():
+    # New React SPA is the default UI. Fall back to the legacy static dashboard
+    # only when the SPA hasn't been built (local dev / CI without a frontend build).
+    if _spa_built():
+        return _serve_spa()
     return _render_with_version("index.html")
 
 
@@ -109,10 +124,11 @@ def terms():
     return _render_with_version("terms.html")
 
 
-# --- React SPA (staging at /app) ------------------------------------------
+# --- React SPA (served at the site root) ----------------------------------
 # Serves real built files (hashed assets, manifest, icons) when they exist and
 # falls back to index.html for client-side routes. Guarded against path
-# traversal. Does not touch /, /api, /auth, /static, /health (registered above).
+# traversal. Does not touch /api, /auth, /static, /health, /privacy, /terms
+# (all registered above; explicit routes win over the catch-all below).
 def _serve_spa(full_path: str = "") -> HTMLResponse | FileResponse | PlainTextResponse:
     index = STATIC_SPA / "index.html"
     if not index.is_file():
@@ -127,11 +143,28 @@ def _serve_spa(full_path: str = "") -> HTMLResponse | FileResponse | PlainTextRe
     )
 
 
+# Legacy staging paths (/app, /app/*) now redirect to the root, where the SPA
+# lives after the cutover. Permanent so browsers/Cloudflare update bookmarks.
 @app.get("/app")
-def spa_root():
-    return _serve_spa()
+def spa_root_redirect():
+    return RedirectResponse("/", status_code=301)
 
 
 @app.get("/app/{full_path:path}")
-def spa_catch_all(full_path: str):
+def spa_app_redirect(full_path: str):
+    return RedirectResponse(f"/{full_path}", status_code=301)
+
+
+# Root catch-all — MUST stay the last route. Serves SPA assets and falls back to
+# index.html for client-side routes. API/auth paths are excluded so their real
+# JSON 404s aren't masked by the HTML shell.
+@app.get("/{full_path:path}")
+def spa_root_catch_all(full_path: str):
+    if full_path.startswith(("api/", "auth/")) or full_path in (
+        "health",
+        "favicon.ico",
+    ):
+        return PlainTextResponse("Not Found", status_code=404)
+    if not _spa_built():
+        return PlainTextResponse("Not Found", status_code=404)
     return _serve_spa(full_path)

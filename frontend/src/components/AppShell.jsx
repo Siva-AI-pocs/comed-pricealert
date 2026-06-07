@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Routes, Route, Link, useLocation } from "react-router-dom";
+import { NavLink, Routes, Route, useLocation } from "react-router-dom";
 import { MENU } from "../nav.js";
 import NowTab from "../tabs/NowTab.jsx";
 import ForecastView from "../tabs/ForecastView.jsx";
@@ -154,9 +154,11 @@ export default function AppShell() {
         </Routes>
 
         <footer className="pp-footer">
-          <Link to="/privacy">Privacy</Link>
+          {/* Full-page nav to the real compliance-reviewed static legal pages
+              served by FastAPI, not the SPA placeholder routes. */}
+          <a href="/privacy">Privacy</a>
           <span aria-hidden="true">·</span>
-          <Link to="/terms">Terms</Link>
+          <a href="/terms">Terms</a>
           <span className="pp-footer-copy">VoltMint</span>
           <GetTheApp />
         </footer>
