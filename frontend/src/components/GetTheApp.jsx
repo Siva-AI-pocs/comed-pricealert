@@ -61,6 +61,8 @@ export default function GetTheApp() {
   const [seen, setSeen] = useState(readSeen);
 
   useEffect(() => {
+    // iOS shows the App Store link only; the version/badge applies to the APK,
+    // so there is nothing to fetch on iOS or inside the native app.
     if (isNativeApp() || detectPlatform() === "ios") return;
     let alive = true;
     // Promise.resolve wrapper turns a synchronous fetch failure (e.g. fetch

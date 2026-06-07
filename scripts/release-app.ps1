@@ -47,8 +47,15 @@ $code = $maj * 10000 + $min * 100 + $pat
 Write-Host "==> Releasing $cur -> $next (code $code)"
 
 # --- build first (nothing persisted if this throws) -----------------------
-& $buildScript -VersionName $next -VersionCode $code
-if ($LASTEXITCODE -ne 0) { throw "APK build failed; release aborted (no files changed)." }
+# build-android.ps1 throws on any failed step ($ErrorActionPreference=Stop), so
+# the catch is the real safety valve; the $LASTEXITCODE check also covers a
+# hypothetical non-throwing non-zero exit. Either way nothing below this runs.
+try {
+  & $buildScript -VersionName $next -VersionCode $code
+  if ($LASTEXITCODE -ne 0) { throw "non-zero exit ($LASTEXITCODE)" }
+} catch {
+  throw "APK build failed; release aborted (no files changed). $_"
+}
 
 # --- persist the release --------------------------------------------------
 # Use WriteAllText (UTF-8, NO BOM) — PS 5.1's `Set-Content -Encoding utf8`
