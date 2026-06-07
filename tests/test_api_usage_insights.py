@@ -148,3 +148,41 @@ class TestPriceRetention:
             db.query(HourlyAverage).filter(HourlyAverage.hour_utc == old_dt).count()
             == 1
         )
+
+
+def _seed_old_usage_no_exact_price(db, email="u@test.com"):
+    """Usage 60 days ago (no HourlyAverage at those timestamps) + a recent price
+    profile covering the same hour-of-day buckets, so the fallback can price it."""
+    user = db.query(User).filter(User.email == email).first()
+    meter = UsageMeter(user_id=user.id, espi_usage_point_id="UPOLD", service_kind="electricity")
+    db.add(meter)
+    db.flush()
+    old = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=60)).replace(
+        minute=0, second=0, microsecond=0, hour=18
+    )
+    recent = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=3)).replace(
+        minute=0, second=0, microsecond=0
+    )
+    # Old usage: 3 hours.
+    for h in range(3):
+        db.add(UsageInterval(meter_id=meter.id, start_utc=old + timedelta(hours=h),
+                             duration_seconds=3600, wh=1000, source="upload"))
+    # Recent profile: a full recent day of prices so every hour-of-day bucket exists.
+    for h in range(24):
+        db.add(HourlyAverage(hour_utc=recent + timedelta(hours=h), avg_price_cents=7.0, sample_count=12))
+    db.commit()
+    return old
+
+
+class TestPriceFallback:
+    def test_old_usage_priced_from_recent_profile(self, client, db):
+        _register(client)
+        old = _seed_old_usage_no_exact_price(db)
+        start = int((old.replace(tzinfo=timezone.utc) - timedelta(hours=1)).timestamp() * 1000)
+        r = client.get(f"/api/usage/insights?start={start}")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["hourly"]) == 3
+        assert all(h["price_estimated"] is True for h in body["hourly"])
+        assert all(h["price_cents"] == pytest.approx(7.0) for h in body["hourly"])
+        assert body["summary"]["actual_cost_cents"] == pytest.approx(21.0)  # 3 kWh * 7¢

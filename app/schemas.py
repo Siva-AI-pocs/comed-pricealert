@@ -200,6 +200,7 @@ class UsageInsightHour(BaseModel):
     price_cents: float
     cost_cents: float
     level: str
+    price_estimated: bool = False
 
 
 class UsageInsightsSummary(BaseModel):

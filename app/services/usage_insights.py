@@ -87,13 +87,37 @@ def compute_insights(
     # Hourly price (cents/kWh) over the same window.
     price_by_hour = {_hour_key(h): p for h, p in price_q.all()}
 
-    # Aligned series — hours present in both usage and price.
+    # Recent-price profile, for usage hours we have no exact price for (e.g. an
+    # older uploaded month). Bucket the last 35 days of hourly prices by
+    # (is_weekend, hour-of-day) in Central Time and average.
+    profile_start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=35)
+    profile_sum: dict[tuple[bool, int], float] = defaultdict(float)
+    profile_cnt: dict[tuple[bool, int], int] = defaultdict(int)
+    for h, p in (
+        db.query(HourlyAverage.hour_utc, HourlyAverage.avg_price_cents)
+        .filter(HourlyAverage.hour_utc >= profile_start)
+        .all()
+    ):
+        ct = _hour_key(h).replace(tzinfo=timezone.utc).astimezone(COMED_TZ)
+        profile_sum[(ct.weekday() >= 5, ct.hour)] += p
+        profile_cnt[(ct.weekday() >= 5, ct.hour)] += 1
+
+    def _profile_price(hour: datetime) -> float | None:
+        ct = hour.replace(tzinfo=timezone.utc).astimezone(COMED_TZ)
+        key = (ct.weekday() >= 5, ct.hour)
+        n = profile_cnt.get(key, 0)
+        return profile_sum[key] / n if n else None
+
     hourly: list[dict] = []
     for hour in sorted(usage_by_hour):
-        if hour not in price_by_hour:
-            continue
+        estimated = False
+        price = price_by_hour.get(hour)
+        if price is None:
+            price = _profile_price(hour)
+            estimated = True
+            if price is None:
+                continue  # no exact and no recent profile → can't price this hour
         kwh = usage_by_hour[hour]
-        price = price_by_hour[hour]
         hourly.append(
             {
                 "hour_utc": hour,
@@ -101,6 +125,7 @@ def compute_insights(
                 "price_cents": round(price, 4),
                 "cost_cents": round(kwh * price, 4),
                 "level": _classify(price)["level"],
+                "price_estimated": estimated,
             }
         )
 
