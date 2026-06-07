@@ -7,3 +7,7 @@
  */
 export const ANDROID_APK_URL = "/static/downloads/voltmint.apk";
 export const APP_STORE_URL = "";
+
+// Release manifest (written by scripts/release-app.ps1) — the download UI reads
+// it to show the current APK version/date and a "New" badge.
+export const APP_VERSION_URL = "/static/downloads/app-version.json";
