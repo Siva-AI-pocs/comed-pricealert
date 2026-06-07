@@ -114,9 +114,9 @@ def compute_insights(
         price = price_by_hour.get(hour)
         if price is None:
             price = _profile_price(hour)
-            estimated = True
             if price is None:
                 continue  # no exact and no recent profile → can't price this hour
+            estimated = True
         kwh = usage_by_hour[hour]
         hourly.append(
             {
