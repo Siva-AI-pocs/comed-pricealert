@@ -91,8 +91,8 @@ if ($Server -eq "local") {
   $origConfig = [System.IO.File]::ReadAllText($config)
   $localConfig = @"
 {
-  "appId": "com.s2rdlabs.pricepulse",
-  "appName": "ComEd Price Pulse",
+  "appId": "com.s2rdlabs.voltmint",
+  "appName": "VoltMint",
   "webDir": "../app/static_spa",
   "server": {
     "url": "$localUrl",

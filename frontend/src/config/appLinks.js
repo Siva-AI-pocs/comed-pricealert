@@ -5,5 +5,5 @@
  * once the iOS build is published. Empty string → the footer shows a
  * "coming soon" state instead of a dead link.
  */
-export const ANDROID_APK_URL = "/static/downloads/pricepulse.apk";
+export const ANDROID_APK_URL = "/static/downloads/voltmint.apk";
 export const APP_STORE_URL = "";

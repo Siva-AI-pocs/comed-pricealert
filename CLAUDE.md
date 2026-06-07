@@ -1,4 +1,4 @@
-# ComEd Price Alert — agent guide
+# VoltMint — agent guide
 
 FastAPI app that polls ComEd real-time electricity prices, stores history, and
 alerts users (Email / Telegram / WhatsApp) when prices cross their threshold.

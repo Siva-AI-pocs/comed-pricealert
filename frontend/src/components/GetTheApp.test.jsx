@@ -8,7 +8,7 @@ async function renderWith(platform, appStoreUrl = "", nativeApp = false) {
     isNativeApp: () => nativeApp,
   }));
   vi.doMock("../config/appLinks.js", () => ({
-    ANDROID_APK_URL: "/static/downloads/pricepulse.apk",
+    ANDROID_APK_URL: "/static/downloads/voltmint.apk",
     APP_STORE_URL: appStoreUrl,
   }));
   const { default: GetTheApp } = await import("./GetTheApp.jsx");
@@ -21,7 +21,7 @@ describe("GetTheApp", () => {
   it("shows the Android download on Android", async () => {
     await renderWith("android");
     const link = screen.getByRole("link", { name: /download android app/i });
-    expect(link).toHaveAttribute("href", "/static/downloads/pricepulse.apk");
+    expect(link).toHaveAttribute("href", "/static/downloads/voltmint.apk");
     expect(link).toHaveAttribute("download");
   });
 

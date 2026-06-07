@@ -1,13 +1,13 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  Build a side-loadable Android APK for ComEd Price Pulse via Capacitor.
+  Build a side-loadable Android APK for VoltMint via Capacitor.
 
 .DESCRIPTION
   Produces a debug-signed APK (installable by side-load, no keystore needed)
   that wraps the hosted site (capacitor.config.json server.url). Copies it to
-  app/static/downloads/pricepulse.apk — FastAPI serves it at
-  /static/downloads/pricepulse.apk and the footer links to it. Commit that APK
+  app/static/downloads/voltmint.apk — FastAPI serves it at
+  /static/downloads/voltmint.apk and the footer links to it. Commit that APK
   to publish it.
 
   Prerequisites (install once):
@@ -27,7 +27,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path $PSScriptRoot -Parent
 $frontend = Join-Path $repo "frontend"
 $downloads = Join-Path $repo "app/static/downloads"
-$apkOut = Join-Path $downloads "pricepulse.apk"
+$apkOut = Join-Path $downloads "voltmint.apk"
 
 function Need($cmd, $hint) {
   if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
@@ -108,4 +108,4 @@ if (-not (Test-Path $built)) { throw "Expected APK not found at $built" }
 New-Item -ItemType Directory -Force -Path $downloads | Out-Null
 Copy-Item $built $apkOut -Force
 Write-Host "==> Done. APK -> $apkOut"
-Write-Host "    Served at /static/downloads/pricepulse.apk. Commit it to publish."
+Write-Host "    Served at /static/downloads/voltmint.apk. Commit it to publish."

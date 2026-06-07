@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures for the ComEd Price Alert test suite.
+Shared pytest fixtures for the VoltMint test suite.
 
 Unit/integration tests use an in-memory SQLite database (StaticPool so a
 single connection is reused — required for :memory: DBs to survive across

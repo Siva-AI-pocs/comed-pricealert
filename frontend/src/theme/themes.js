@@ -1,5 +1,5 @@
 /**
- * Brand themes for ComEd Price Pulse (DESIGN_SYSTEM.md / theme-picker mockup).
+ * Brand themes for VoltMint (DESIGN_SYSTEM.md / theme-picker mockup).
  *
  * Three distinctive, non-purple brand directions — Voltaic (electric blue,
  * default), Grid (control-room teal), Volt (neon lime) — each with a light
