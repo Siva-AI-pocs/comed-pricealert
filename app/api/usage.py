@@ -108,6 +108,8 @@ def list_meters(
             UsageMeter.label,
             UsageMeter.created_at,
             func.count(UsageInterval.id).label("interval_count"),
+            func.min(UsageInterval.start_utc).label("interval_start_utc"),
+            func.max(UsageInterval.start_utc).label("interval_end_utc"),
         )
         .outerjoin(UsageInterval, UsageInterval.meter_id == UsageMeter.id)
         .filter(UsageMeter.user_id == current_user.id)
@@ -123,6 +125,8 @@ def list_meters(
             label=r.label,
             created_at=r.created_at,
             interval_count=r.interval_count,
+            interval_start_utc=r.interval_start_utc,
+            interval_end_utc=r.interval_end_utc,
         )
         for r in rows
     ]
