@@ -41,6 +41,7 @@ def compute_insights(
     start: int | None = None,
     end: int | None = None,
     shiftable_pct: float | None = None,
+    flat_rate_cents: float | None = None,
 ) -> dict:
     """Return aligned hourly (usage, price, cost) plus a savings/cost summary.
 
@@ -52,6 +53,10 @@ def compute_insights(
     if shiftable_pct is None:
         shiftable_pct = settings.default_shiftable_pct
     shiftable_pct = max(0.0, min(1.0, float(shiftable_pct)))
+
+    if flat_rate_cents is None:
+        flat_rate_cents = settings.flat_rate_cents
+    flat_rate_cents = max(0.0, float(flat_rate_cents))
 
     if start is not None:
         window_start = datetime.fromtimestamp(start / 1000, tz=timezone.utc).replace(
@@ -133,7 +138,7 @@ def compute_insights(
     actual_cost = sum(h["cost_cents"] for h in hourly)
 
     # Flat-rate bill comparison.
-    flat_cost = total_kwh * settings.flat_rate_cents
+    flat_cost = total_kwh * flat_rate_cents
     hourly_vs_flat = flat_cost - actual_cost
 
     # Smart-shift savings, grouped by Central-Time day (matches how ComEd bills).
@@ -170,7 +175,7 @@ def compute_insights(
             "total_kwh": round(total_kwh, 3),
             "actual_cost_cents": round(actual_cost, 2),
             "flat_cost_cents": round(flat_cost, 2),
-            "flat_rate_cents": settings.flat_rate_cents,
+            "flat_rate_cents": round(flat_rate_cents, 4),
             "hourly_vs_flat_cents": round(hourly_vs_flat, 2),
             "shiftable_pct": round(shiftable_pct, 2),
             "shiftable_kwh": round(shiftable_kwh_total, 3),

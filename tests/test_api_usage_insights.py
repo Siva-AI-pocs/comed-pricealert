@@ -186,3 +186,15 @@ class TestPriceFallback:
         assert all(h["price_estimated"] is True for h in body["hourly"])
         assert all(h["price_cents"] == pytest.approx(7.0) for h in body["hourly"])
         assert body["summary"]["actual_cost_cents"] == pytest.approx(21.0)  # 3 kWh * 7¢
+
+
+class TestCustomFlatRate:
+    def test_flat_rate_param_changes_flat_cost(self, client, db):
+        _register(client)
+        _seed_usage_and_price(db)  # total_kwh = 4, actual = 32¢
+        r = client.get("/api/usage/insights?days=7&flat_rate_cents=10")
+        assert r.status_code == 200
+        s = r.json()["summary"]
+        assert s["flat_rate_cents"] == pytest.approx(10.0)
+        assert s["flat_cost_cents"] == pytest.approx(40.0)        # 4 kWh * 10¢
+        assert s["hourly_vs_flat_cents"] == pytest.approx(8.0)     # 40 - 32

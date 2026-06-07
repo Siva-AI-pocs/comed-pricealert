@@ -218,6 +218,7 @@ def usage_insights(
     start: int | None = Query(default=None, description="Window start, epoch ms"),
     end: int | None = Query(default=None, description="Window end, epoch ms"),
     shiftable_pct: float | None = Query(default=None, ge=0.0, le=1.0),
+    flat_rate_cents: float | None = Query(default=None, gt=0.0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -229,4 +230,5 @@ def usage_insights(
         start=start,
         end=end,
         shiftable_pct=shiftable_pct,
+        flat_rate_cents=flat_rate_cents,
     )
